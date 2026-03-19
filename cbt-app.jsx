@@ -49,7 +49,11 @@ function clearSession(studentId) {
 // ─── UTILITIES ───────────────────────────────────────────────────────────────
 function uid() { return Math.random().toString(36).slice(2,9); }
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
-function fmt(sec) { const m = Math.floor(sec/60), s = sec%60; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+function fmt(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 function dateStr() { return new Date().toISOString(); }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
@@ -195,25 +199,34 @@ function TextInput({
 
 // ─── STUDENT FORM ─────────────────────────────────────────────────────────────
 function StudentForm({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || {regNumber:"",fullName:"",className:"SS3",email:"",gender:""});
-  const set = k => e => setForm(f => ({...f,[k]:e.target.value}));
+  const [form, setForm] = useState(initial || { regNumber: "", fullName: "", className: "SS3", email: "", gender: "", isActive: true });
+  const set = k => e => {
+    const v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setForm(f => ({ ...f, [k]: v }));
+  };
   return (
     <div>
-      <Field label="Registration Number *"><input style={inputStyle} value={form.regNumber} onChange={set("regNumber")} placeholder="STU/2024/005"/></Field>
-      <Field label="Full Name *"><input style={inputStyle} value={form.fullName} onChange={set("fullName")} placeholder="John Doe"/></Field>
+      <Field label="Registration Number *"><input style={inputStyle} value={form.regNumber} onChange={set("regNumber")} placeholder="STU/2024/005" /></Field>
+      <Field label="Full Name *"><input style={inputStyle} value={form.fullName} onChange={set("fullName")} placeholder="John Doe" /></Field>
       <Field label="Class *">
         <select style={inputStyle} value={form.className} onChange={set("className")}>
-          {CLASSES.map(c=><option key={c}>{c}</option>)}
+          {CLASSES.map(c => <option key={c}>{c}</option>)}
         </select>
       </Field>
-      <Field label="Email (optional)"><input style={inputStyle} value={form.email} onChange={set("email")} placeholder="student@school.edu" type="email"/></Field>
+      <Field label="Email (optional)"><input style={inputStyle} value={form.email} onChange={set("email")} placeholder="student@school.edu" type="email" /></Field>
       <Field label="Gender (optional)">
         <select style={inputStyle} value={form.gender} onChange={set("gender")}>
           <option value="">-- Select --</option>
           <option>Male</option><option>Female</option>
         </select>
       </Field>
-      <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
+      <Field label="Account Status">
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", marginTop: 8 }}>
+          <input type="checkbox" checked={form.isActive} onChange={set("isActive")} style={{ accentColor: "#1d4ed8" }} />
+          Active Account (Allowed to login and take exams)
+        </label>
+      </Field>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button type="button" style={btnGhost} onClick={onClose}>Cancel</button>
         <button type="button" style={btnPrimary} onClick={() => onSave(form)}>Save Student</button>
       </div>
@@ -223,22 +236,65 @@ function StudentForm({ initial, onSave, onClose }) {
 
 // ─── QUESTION FORM ────────────────────────────────────────────────────────────
 function QuestionForm({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || { question_text: "", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "A" });
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const [form, setForm] = useState(initial || { subject: "", class_name: "SS3", question_text: "", type: "mcq", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "A", answer: "", answerBool: true });
+  const set = k => e => {
+    const v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setForm(f => ({ ...f, [k]: v }));
+  };
   return (
     <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Subject *">
+          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" />
+        </Field>
+        <Field label="Class *">
+          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")}>
+            {CLASSES.map(c => <option key={c}>{c}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Question Type *">
+          <select style={inputStyle} value={form.type} onChange={set("type")}>
+            <option value="mcq">Multiple Choice</option>
+            <option value="fib">Fill in the Blanks</option>
+            <option value="boolean">True / False</option>
+          </select>
+        </Field>
+      </div>
       <Field label="Question Text *">
         <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.question_text} onChange={set("question_text")} placeholder="Enter question..." />
       </Field>
-      <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Answer Options (select correct one)</p>
-      {['A', 'B', 'C', 'D'].map((opt) => (
-        <div key={opt} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-          <input type="radio" name="correct" checked={form.correct_option === opt} onChange={() => setForm(f => ({ ...f, correct_option: opt }))} style={{ accentColor: "#1d4ed8" }} />
-          <span style={{ fontSize: 13, color: "#64748b", minWidth: 20 }}>{opt}.</span>
-          <input style={{ ...inputStyle, flex: 1 }} value={form[`option_${opt.toLowerCase()}`]} onChange={set(`option_${opt.toLowerCase()}`)} placeholder={`Option ${opt}`} />
-        </div>
-      ))}
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+
+      {form.type === "mcq" && (
+        <>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Answer Options (select correct one)</p>
+          {['A', 'B', 'C', 'D'].map((opt) => (
+            <div key={opt} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <input type="radio" name="correct" checked={form.correct_option === opt} onChange={() => setForm(f => ({ ...f, correct_option: opt }))} style={{ accentColor: "#1d4ed8" }} />
+              <span style={{ fontSize: 13, color: "#64748b", minWidth: 20 }}>{opt}.</span>
+              <input style={{ ...inputStyle, flex: 1 }} value={form[`option_${opt.toLowerCase()}`]} onChange={set(`option_${opt.toLowerCase()}`)} placeholder={`Option ${opt}`} />
+            </div>
+          ))}
+        </>
+      )}
+
+      {form.type === "fib" && (
+        <Field label="Correct Answer (Exact Match) *">
+          <input style={inputStyle} value={form.answer} onChange={set("answer")} placeholder="Enter the correct answer..." />
+        </Field>
+      )}
+
+      {form.type === "boolean" && (
+        <Field label="Correct Answer *">
+          <select style={inputStyle} value={form.answerBool ? "true" : "false"} onChange={e => setForm(f => ({ ...f, answerBool: e.target.value === "true" }))}>
+            <option value="true">True</option>
+            <option value="false">False</option>
+          </select>
+        </Field>
+      )}
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
         <button type="button" style={btnGhost} onClick={onClose}>Cancel</button>
         <button type="button" style={btnPrimary} onClick={() => onSave(form)}>Save Question</button>
       </div>
@@ -248,15 +304,37 @@ function QuestionForm({ initial, onSave, onClose }) {
 
 // ─── EXAM FORM ────────────────────────────────────────────────────────────────
 function ExamForm({ initial, questions, onSave, onClose }) {
-  const [form, setForm] = useState(initial || { title: "", description: "", duration_minutes: 30, starts_at: "", ends_at: "", is_active: true, question_ids: [] });
+  const [form, setForm] = useState(initial || { title: "", subject: "", class_name: "SS3", description: "", duration_minutes: 30, starts_at: "", ends_at: "", is_active: true, question_ids: [] });
   const set = k => e => { const v = e.target.type === "checkbox" ? e.target.checked : e.target.value; setForm(f => ({ ...f, [k]: v })); };
   const toggleQ = id => setForm(f => {
     const ids = f.question_ids.includes(id) ? f.question_ids.filter(x => x !== id) : [...f.question_ids, id];
     return { ...f, question_ids: ids };
   });
+
+  const filteredQs = useMemo(() => {
+    const s = (form.subject || "").trim().toLowerCase();
+    const c = (form.class_name || "").trim().toLowerCase();
+    return (questions || []).filter(q => {
+      if (!q) return false;
+      const qSubject = (q.subject || "").trim().toLowerCase();
+      const qClass = (q.class_name || "").trim().toLowerCase();
+      return (s === "" || qSubject === s) && (c === "" || qClass === c);
+    });
+  }, [questions, form.subject, form.class_name]);
+
   return (
     <div>
       <Field label="Exam Title *"><input style={inputStyle} value={form.title} onChange={set("title")} placeholder="e.g. Mathematics Mid-Term" /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Subject *">
+          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" />
+        </Field>
+        <Field label="Class *">
+          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")}>
+            {CLASSES.map(c => <option key={c}>{c}</option>)}
+          </select>
+        </Field>
+      </div>
       <Field label="Description"><textarea style={{ ...inputStyle, minHeight: 60 }} value={form.description} onChange={set("description")} placeholder="Exam description..." /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Duration (mins)"><input style={inputStyle} type="number" value={form.duration_minutes} onChange={set("duration_minutes")} min={5} /></Field>
@@ -275,8 +353,13 @@ function ExamForm({ initial, questions, onSave, onClose }) {
         Select Questions ({form.question_ids.length} selected)
       </p>
       <div style={{ maxHeight: 180, overflowY: "auto", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-        {questions.length === 0 && <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>No questions found. Create questions first.</p>}
-        {questions.map(q => (
+        {filteredQs.length === 0 && (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>No questions found for this subject and class.</p>
+            <p style={{ color: "#64748b", fontSize: 11, marginTop: 4 }}>Try changing the filters above or create new questions first.</p>
+          </div>
+        )}
+        {filteredQs.map(q => (
           <label key={q.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
             <input type="checkbox" checked={form.question_ids.includes(q.id)} onChange={() => toggleQ(q.id)} style={{ marginTop: 2, accentColor: "#1d4ed8" }} />
             <span style={{ fontSize: 13, color: "#374151" }}>{q.question_text}</span>
@@ -973,29 +1056,31 @@ function StudentManagement({ students, setStudents, toast }) {
       if (modal === "add") {
         if (students.find(s => s.regNumber === form.regNumber)) { toast.error("Registration number already exists."); return; }
         const payload = {
-          registration_number: form.regNumber,
-          name: form.fullName,
-          email: form.email || `${form.regNumber.replace(/\//g, '')}@cbtportal.edu`,
+          registration_number: form.regNumber.trim(),
+          name: form.fullName.trim(),
+          email: (form.email || "").trim() || `${form.regNumber.trim().replace(/\//g, '')}@cbtportal.edu`,
           password: "password123",
-          class_name: form.className,
-          gender: form.gender,
+          class_name: (form.className || "").trim(),
+          gender: (form.gender || "").trim(),
+          is_active: form.isActive,
         };
         const res = await api.createStudent(payload);
         const r = res.data;
-        const mapped = { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "" };
+        const mapped = { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "", isActive: Boolean(r.is_active) };
         setStudents(ss => [...ss, mapped]);
         toast.success("Student registered successfully.");
       } else {
         const payload = {
-          registration_number: form.regNumber,
-          name: form.fullName,
-          email: form.email,
-          class_name: form.className,
-          gender: form.gender,
+          registration_number: form.regNumber.trim(),
+          name: form.fullName.trim(),
+          email: (form.email || "").trim(),
+          class_name: (form.className || "").trim(),
+          gender: (form.gender || "").trim(),
+          is_active: form.isActive,
         };
         const res = await api.updateStudent(Number(modal.id), payload);
         const r = res.data;
-        const mapped = { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "" };
+        const mapped = { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "", isActive: Boolean(r.is_active) };
         setStudents(ss => ss.map(s => s.id === modal.id ? mapped : s));
         toast.success("Student updated.");
       }
@@ -1020,18 +1105,19 @@ function StudentManagement({ students, setStudents, toast }) {
     try {
       const results = await Promise.all(newStudents.map(s => {
         const payload = {
-          registration_number: s.regNumber,
-          name: s.fullName,
-          email: s.email || `${s.regNumber.replace(/\//g, '')}@cbtportal.edu`,
+          registration_number: s.regNumber.trim(),
+          name: s.fullName.trim(),
+          email: (s.email || "").trim() || `${s.regNumber.trim().replace(/\//g, '')}@cbtportal.edu`,
           password: "password123",
-          class_name: s.className,
-          gender: s.gender,
+          class_name: (s.className || "").trim(),
+          gender: (s.gender || "").trim(),
+          is_active: true,
         };
         return api.createStudent(payload);
       }));
       const mapped = results.map(res => {
         const r = res.data;
-        return { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "" };
+        return { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "", isActive: Boolean(r.is_active) };
       });
       setStudents(ss => [...ss, ...mapped]);
       toast.success(`${mapped.length} students registered successfully!`);
@@ -1061,7 +1147,7 @@ function StudentManagement({ students, setStudents, toast }) {
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead>
             <tr style={{background:"#f8fafc"}}>
-              {["Reg Number","Full Name","Class","Gender","Email","Actions"].map(h=>(
+              {["Reg Number","Full Name","Class","Status","Email","Actions"].map(h=>(
                 <th key={h} style={{padding:"12px 16px",textAlign:"left",fontSize:12,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>
               ))}
             </tr>
@@ -1072,7 +1158,9 @@ function StudentManagement({ students, setStudents, toast }) {
                 <td style={{padding:"12px 16px",fontSize:14,fontWeight:600,color:"#1d4ed8"}}>{s.regNumber}</td>
                 <td style={{padding:"12px 16px",fontSize:14}}>{s.fullName}</td>
                 <td style={{padding:"12px 16px"}}><Badge>{s.className}</Badge></td>
-                <td style={{padding:"12px 16px",fontSize:14,color:"#64748b"}}>{s.gender||"—"}</td>
+                <td style={{padding:"12px 16px"}}>
+                  <Badge color={s.isActive ? "green" : "red"}>{s.isActive ? "Active" : "Disabled"}</Badge>
+                </td>
                 <td style={{padding:"12px 16px",fontSize:13,color:"#64748b"}}>{s.email||"—"}</td>
                 <td style={{padding:"12px 16px"}}>
                   <div style={{display:"flex",gap:8}}>
@@ -1150,13 +1238,13 @@ function BulkUploadModal({ onClose, onImport, toast }) {
       if (correct===undefined) errs.push(`Row ${rowNum}: correct_option must be A/B/C/D`);
       q = { type:"mcq", subject, className, text, options:opts, correct, score, difficulty, tags };
     } else if (type==="fib") {
-      const expected = (row.expected_answer||"").trim();
+      const expected = (row.expected_answer||row.answer||"").trim();
       if (!expected) errs.push(`Row ${rowNum}: expected_answer required for FIB`);
       q = { type:"fib", subject, className, text, answer:expected, score, difficulty, tags };
     } else if (type==="boolean") {
-      const b = (row.answer_bool||"").toString().trim().toLowerCase();
-      const isTrue = b==="true" || b==="t" || b==="1";
-      const isFalse = b==="false" || b==="f" || b==="0";
+      const b = (row.answer_bool||row.answer_bool||row.answer||"").toString().trim().toLowerCase();
+      const isTrue = b==="true" || b==="t" || b==="1" || b==="yes" || b==="y";
+      const isFalse = b==="false" || b==="f" || b==="0" || b==="no" || b==="n";
       if (!isTrue && !isFalse) errs.push(`Row ${rowNum}: answer_bool must be true/false`);
       q = { type:"boolean", subject, className, text, answerBool:isTrue, score, difficulty, tags };
     } else {
@@ -1167,28 +1255,53 @@ function BulkUploadModal({ onClose, onImport, toast }) {
   };
 
   const parseCSV = async (text) => {
-    const lines = text.split(/\r?\n/);
+    const lines = [];
+    let curLine = "", inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '"') inQ = !inQ;
+      if ((ch === '\n' || ch === '\r') && !inQ) {
+        if (ch === '\r' && text[i+1] === '\n') i++;
+        lines.push(curLine);
+        curLine = "";
+      } else {
+        curLine += ch;
+      }
+    }
+    if (curLine) lines.push(curLine);
+
     if (lines.length < 2) return { rows:[], errs:["Empty file or missing header"], skips:[] };
-    const header = lines[0].split(",").map(h=>h.replace(/^"+|"+$/g,"").trim().toLowerCase());
+    
+    const parseLine = (line) => {
+      const cols = [];
+      let cur = "", inQ = false;
+      for (let j = 0; j < line.length; j++) {
+        const ch = line[j];
+        if (ch === '"') {
+          if (inQ && line[j+1] === '"') { cur += '"'; j++; }
+          else inQ = !inQ;
+        }
+        else if (ch === ',' && !inQ) { cols.push(cur); cur = ""; }
+        else cur += ch;
+      }
+      cols.push(cur);
+      return cols;
+    };
+
+    const header = parseLine(lines[0]).map(h => h.trim().toLowerCase());
     const getObj = (cols) => {
       const obj = {};
-      header.forEach((h,i)=>{ obj[h] = (cols[i]||"").replace(/^"+|"+$/g,"").trim(); });
+      header.forEach((h, i) => { obj[h] = (cols[i] || "").trim(); });
       return obj;
     };
+
     const rows=[], errs=[], skips=[];
     let processed = 0;
     for (let i=1;i<lines.length;i++) {
       const rowNum = i+1;
       const line = lines[i];
       if (!line.trim()) continue;
-      const cols=[]; let cur="", inQ=false;
-      for (let j=0;j<line.length;j++) {
-        const ch=line[j];
-        if (ch==='"') inQ=!inQ;
-        else if (ch===',' && !inQ) { cols.push(cur); cur=""; }
-        else cur+=ch;
-      }
-      cols.push(cur);
+      const cols = parseLine(line);
       const { q, errs: rowErrs } = mapRow(getObj(cols), rowNum);
       if (rowErrs.length) errs.push(...rowErrs); else if (q) rows.push(q); else skips.push(`Row ${rowNum}: skipped`);
       processed++;
@@ -1239,9 +1352,7 @@ function BulkUploadModal({ onClose, onImport, toast }) {
       setStep("report");
       return;
     }
-    const toAdd = parsed.map(q => ({...q, id:"q"+uid()}));
-    onImport(toAdd);
-    toast.success(`${toAdd.length} question${toAdd.length!==1?"s":""} imported successfully!`);
+    onImport(parsed);
     onClose();
   };
 
@@ -1364,12 +1475,61 @@ function BulkUploadModal({ onClose, onImport, toast }) {
 function QuestionManagement({ questions, setQuestions, toast }) {
   const [modal, setModal] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
+  const [filters, setFilters] = useState({ subject: "all", class: "all" });
+  const [selected, setSelected] = useState([]);
+
+  const filteredQuestions = useMemo(() => {
+    return (questions || []).filter(q => {
+      if (!q) return false;
+      const sMatch = filters.subject === "all" || (q.subject && String(q.subject).trim() === filters.subject);
+      const cMatch = filters.class === "all" || (q.class_name && String(q.class_name).trim() === filters.class);
+      return sMatch && cMatch;
+    });
+  }, [questions, filters]);
+
+  const handleFilterChange = (type, value) => {
+    setFilters(f => ({ ...f, [type]: value }));
+    setSelected([]);
+  };
+
+  const toggleSelect = id => {
+    setSelected(s => s.includes(id) ? s.filter(i => i !== id) : [...s, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.length === filteredQuestions.length) {
+      setSelected([]);
+    } else {
+      setSelected(filteredQuestions.map(q => q.id));
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (!confirm(`Delete ${selected.length} selected questions?`)) return;
+    try {
+      await Promise.all(selected.map(id => api.deleteQuestion(id)));
+      setQuestions(qs => qs.filter(q => !selected.includes(q.id)));
+      setSelected([]);
+      toast.success("Selected questions deleted.");
+    } catch {
+      toast.error("Failed to delete some questions.");
+    }
+  };
 
   const save = async form => {
-    if (!form.question_text.trim() || !form.option_a.trim() || !form.option_b.trim() || !form.option_c.trim() || !form.option_d.trim()) {
-      toast.error("All fields are required.");
+    if (!form.subject?.trim() || !form.class_name?.trim() || !form.question_text?.trim()) {
+      toast.error("Subject, class, and question text are required.");
       return;
     }
+    if (form.type === "mcq" && (!form.option_a?.trim() || !form.option_b?.trim() || !form.option_c?.trim() || !form.option_d?.trim())) {
+      toast.error("All options are required for multiple choice questions.");
+      return;
+    }
+    if (form.type === "fib" && !form.answer?.trim()) {
+      toast.error("Correct answer is required for fill-in-the-blanks.");
+      return;
+    }
+
     try {
       if (modal === "add") {
         const res = await api.createQuestion(form);
@@ -1389,15 +1549,42 @@ function QuestionManagement({ questions, setQuestions, toast }) {
   const del = async id => {
     if (!confirm("Delete this question?")) return;
     try {
-      await api.deleteQuestion(id);
+      await api.deleteQuestion(Number(id));
       setQuestions(qs => qs.filter(q => q.id !== id));
       toast.success("Deleted.");
-    } catch {
-      toast.error("Failed to delete question.");
+    } catch (e) {
+      console.error("[Delete Question Error]", e);
+      toast.error(e.response?.data?.message || "Failed to delete question.");
     }
   };
 
-  const handleBulkImport = newQs => setQuestions(qs => [...qs, ...newQs]);
+  const handleBulkImport = async newQs => {
+    try {
+      const results = await Promise.all(newQs.map(q => {
+        const type = (q.type || 'mcq').toLowerCase();
+        const payload = {
+          subject: q.subject,
+          class_name: q.className,
+          type: type,
+          question_text: q.text,
+          option_a: type === 'mcq' ? (q.options ? q.options[0] : null) : (type === 'boolean' ? 'True' : null),
+          option_b: type === 'mcq' ? (q.options ? q.options[1] : null) : (type === 'boolean' ? 'False' : null),
+          option_c: type === 'mcq' ? (q.options ? q.options[2] : null) : null,
+          option_d: type === 'mcq' ? (q.options ? q.options[3] : null) : null,
+          correct_option: type === 'mcq' ? (['A', 'B', 'C', 'D'][q.correct] || q.correct_option || 'A') : (type === 'boolean' ? (q.answerBool ? 'A' : (q.answer === 'true' ? 'A' : 'B')) : null),
+          answer: type === 'fib' ? (q.answer || q.correct_answer) : null,
+          answerBool: type === 'boolean' ? (q.answerBool ?? (q.answer === 'true' || q.correct_answer === 'true')) : null,
+        };
+        return api.createQuestion(payload);
+      }));
+      const mapped = results.map(res => res.data);
+      setQuestions(qs => [...qs, ...mapped]);
+      toast.success(`${mapped.length} questions imported successfully!`);
+    } catch (e) {
+      console.error("[Bulk Import Error]", e);
+      toast.error("Failed to bulk import some questions. Ensure all required fields are present.");
+    }
+  };
 
   return (
     <div>
@@ -1408,28 +1595,52 @@ function QuestionManagement({ questions, setQuestions, toast }) {
           <button style={btnPrimary} onClick={() => setModal("add")}>+ Add Question</button>
         </div>
       </div>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+        <select style={inputStyle} value={filters.subject} onChange={e => handleFilterChange("subject", e.target.value)}>
+          <option value="all">All Subjects</option>
+          {[...new Set(questions.map(q => q.subject).filter(Boolean))].map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select style={inputStyle} value={filters.class} onChange={e => handleFilterChange("class", e.target.value)}>
+          <option value="all">All Classes</option>
+          {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {selected.length > 0 && <button style={btnDanger} onClick={deleteSelected}>Delete Selected ({selected.length})</button>}
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {questions.map((q, i) => (
-          <div key={q.id} style={{ background: "#fff", borderRadius: 10, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{i + 1}. {q.question_text}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                  {['a', 'b', 'c', 'd'].map((opt) => (
-                    <span key={opt} style={{ fontSize: 13, color: q.correct_option === opt.toUpperCase() ? "#16a34a" : "#64748b", background: q.correct_option === opt.toUpperCase() ? "#dcfce7" : "#f8fafc", padding: "4px 10px", borderRadius: 6 }}>
-                      {q.correct_option === opt.toUpperCase() ? "✓ " : ""}{opt.toUpperCase()}. {q[`option_${opt}`]}
-                    </span>
-                  ))}
+        <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: 16, background: "#f1f5f9", borderRadius: 6 }}>
+          <input type="checkbox" checked={selected.length === filteredQuestions.length && filteredQuestions.length > 0} onChange={toggleSelectAll} />
+          <span>{selected.length} selected</span>
+        </div>
+        {filteredQuestions.map((q, i) => (
+          <div key={q.id} style={{ background: "#fff", borderRadius: 10, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 16 }}>
+            <input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggleSelect(q.id)} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{i + 1}. {q.question_text}</p>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 500, background: "#e0f2fe", color: "#0ea5e9", padding: "2px 8px", borderRadius: 12 }}>{q.subject}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#22c55e", padding: "2px 8px", borderRadius: 12 }}>{q.class_name}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                    {['a', 'b', 'c', 'd'].map((opt) => (
+                      <span key={opt} style={{ fontSize: 13, color: q.correct_option === opt.toUpperCase() ? "#16a34a" : "#64748b", background: q.correct_option === opt.toUpperCase() ? "#dcfce7" : "#f8fafc", padding: "4px 10px", borderRadius: 6 }}>
+                        {q.correct_option === opt.toUpperCase() ? "✓ " : ""}{opt.toUpperCase()}. {q[`option_${opt}`]}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                <button style={btnGhost} onClick={() => setModal(q)}>Edit</button>
-                <button style={btnDanger} onClick={() => del(q.id)}>Del</button>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button style={btnGhost} onClick={() => setModal(q)}>Edit</button>
+                  <button style={btnDanger} onClick={() => del(q.id)}>Del</button>
+                </div>
               </div>
             </div>
           </div>
         ))}
-        {questions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No questions found.</div>}
+        {filteredQuestions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No questions found.</div>}
       </div>
       {modal && (
         <Modal title={modal === "add" ? "Add Question" : "Edit Question"} onClose={() => setModal(null)}>
@@ -1446,11 +1657,17 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
   const [modal, setModal] = useState(null);
 
   const save = async form => {
-    if (!form.title.trim()) { toast.error("Exam title required."); return; }
+    if (!form.title?.trim() || !form.subject?.trim() || !form.class_name?.trim()) { 
+      toast.error("Exam title, subject, and class are required."); 
+      return; 
+    }
     if (form.question_ids.length === 0) { toast.error("Select at least one question."); return; }
     
     const payload = {
       ...form,
+      title: form.title.trim(),
+      subject: form.subject.trim(),
+      class_name: form.class_name.trim(),
       starts_at: form.starts_at || null,
       ends_at: form.ends_at || null,
     };
@@ -1561,6 +1778,10 @@ function ResultsManagement({ results, students, exams, questions }) {
         score: x.score,
         total: x.total_questions,
         submittedAt: x.submitted_at || x.created_at,
+        answers: (x.answers || []).reduce((acc, a) => {
+          acc[a.question_id] = a.selected_option.toUpperCase();
+          return acc;
+        }, {}),
       }));
       setBackendResults(rows);
       setFetchError("");
@@ -1584,57 +1805,157 @@ function ResultsManagement({ results, students, exams, questions }) {
     const csv = rows.map(r=>r.join(",")).join("\n");
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = "results.csv";
+    a.download = "all_results.csv";
     a.click();
+  };
+
+  const deleteResult = async (id) => {
+    if (!confirm("Are you sure you want to delete this result? This action cannot be undone.")) return;
+    try {
+      await api.deleteResult(id);
+      setBackendResults(prev => prev.filter(r => r.id !== id));
+      toast.success("Result deleted successfully.");
+    } catch (e) {
+      toast.error("Failed to delete result.");
+    }
+  };
+
+  const downloadResult = (r, format = "json") => {
+     const s = students.find(x => x.id === r.studentId);
+     const e = exams.find(x => x.id === r.examId);
+     const pct = Math.round(r.score / r.total * 100);
+     
+     const data = {
+       id: r.id,
+       student: {
+         name: s?.fullName,
+         regNumber: s?.regNumber,
+         class: s?.className
+       },
+       exam: {
+         title: e?.title,
+         subject: e?.subject
+       },
+       score: r.score,
+       total: r.total,
+       percentage: pct,
+       submittedAt: r.submittedAt,
+       answers: Object.entries(r.answers || {}).map(([qid, ans]) => {
+         const q = questions.find(x => x.id === qid);
+         return {
+           question: q?.question_text || q?.text,
+           givenAnswer: ans,
+           correctAnswer: q?.correct_option || (q?.options && q.options[q.correct])
+         };
+       })
+     };
+
+     let blob, extension;
+     if (format === "json") {
+       blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+       extension = "json";
+     } else if (format === "csv") {
+       const rows = [
+         ["Field", "Value"],
+         ["Student Name", s?.fullName],
+         ["Reg Number", s?.regNumber],
+         ["Class", s?.className],
+         ["Exam Title", e?.title],
+         ["Subject", e?.subject],
+         ["Score", `${r.score}/${r.total}`],
+         ["Percentage", `${pct}%`],
+         ["Submitted At", new Date(r.submittedAt).toLocaleString()],
+         [],
+         ["#", "Question", "Given Answer", "Correct Answer", "Result"]
+       ];
+       data.answers.forEach((a, i) => {
+         rows.push([i + 1, a.question, a.givenAnswer, a.correctAnswer, a.givenAnswer === a.correctAnswer ? "Correct" : "Incorrect"]);
+       });
+       const csvContent = rows.map(row => row.map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+       blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+       extension = "csv";
+     }
+
+     const url = URL.createObjectURL(blob);
+     const a = document.createElement("a");
+     a.href = url;
+     a.download = `result_${s?.regNumber || "unknown"}_${r.id}.${extension}`;
+     a.click();
+     URL.revokeObjectURL(url);
+   };
+
+  const printResult = (r) => {
+    setViewResult(r);
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
 
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#0f172a"}}>Result Management</h1>
-        <button style={btnPrimary} onClick={exportCSV}>⬇ Export CSV</button>
-      </div>
-      {fetchError && <div style={{marginBottom:12,background:"#fef2f2",color:"#dc2626",padding:"10px 14px",borderRadius:8,fontSize:13}}>{fetchError}</div>}
-      <div style={{display:"flex",gap:12,marginBottom:16}}>
-        <select style={{...inputStyle,maxWidth:160}} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
-          <option value="All">All Classes</option>
-          {CLASSES.map(c=><option key={c}>{c}</option>)}
-        </select>
-        <select style={{...inputStyle,maxWidth:220}} value={filterExam} onChange={e=>setFilterExam(e.target.value)}>
-          <option value="All">All Exams</option>
-          {exams.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
-        </select>
-      </div>
-      <div style={{background:"#fff",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",overflow:"hidden"}}>
-        <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead>
-            <tr style={{background:"#f8fafc"}}>
-              {["Student","Reg Number","Class","Exam","Score","Status","Date","Detail"].map(h=>(
-                <th key={h} style={{padding:"12px 16px",textAlign:"left",fontSize:12,fontWeight:700,color:"#64748b",textTransform:"uppercase"}}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(r => {
-              const s = students.find(x=>x.id===r.studentId);
-              const e = exams.find(x=>x.id===r.examId);
-              const pct = Math.round(r.score/r.total*100);
-              return (
-                <tr key={r.id} style={{borderTop:"1px solid #f1f5f9"}}>
-                  <td style={{padding:"12px 16px",fontSize:14,fontWeight:600}}>{s?.fullName||"Unknown"}</td>
-                  <td style={{padding:"12px 16px",fontSize:13,color:"#1d4ed8"}}>{s?.regNumber||"—"}</td>
-                  <td style={{padding:"12px 16px"}}><Badge>{s?.className||"?"}</Badge></td>
-                  <td style={{padding:"12px 16px",fontSize:13}}>{e?.title||"Unknown"}</td>
-                  <td style={{padding:"12px 16px",fontSize:14,fontWeight:700}}>{r.score}/{r.total} <span style={{fontWeight:400,color:"#64748b"}}>({pct}%)</span></td>
-                  <td style={{padding:"12px 16px"}}><Badge color={pct>=50?"green":"red"}>{pct>=50?"Pass":"Fail"}</Badge></td>
-                  <td style={{padding:"12px 16px",fontSize:12,color:"#64748b"}}>{new Date(r.submittedAt).toLocaleDateString()}</td>
-                  <td style={{padding:"12px 16px"}}><button style={btnGhost} onClick={()=>setViewResult(r)}>View</button></td>
-                </tr>
-              );
-            })}
-            {filtered.length===0 && <tr><td colSpan={8} style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No results found.</td></tr>}
-          </tbody>
-        </table>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #modal-root, #modal-root * { visibility: visible; }
+          #modal-root { position: absolute; left: 0; top: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+      <div id="modal-root"></div>
+      <div className="no-print">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#0f172a"}}>Result Management</h1>
+          <button style={btnPrimary} onClick={exportCSV}>⬇ Export CSV</button>
+        </div>
+        {fetchError && <div style={{marginBottom:12,background:"#fef2f2",color:"#dc2626",padding:"10px 14px",borderRadius:8,fontSize:13}}>{fetchError}</div>}
+        <div style={{display:"flex",gap:12,marginBottom:16}}>
+          <select style={{...inputStyle,maxWidth:160}} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
+            <option value="All">All Classes</option>
+            {CLASSES.map(c=><option key={c}>{c}</option>)}
+          </select>
+          <select style={{...inputStyle,maxWidth:220}} value={filterExam} onChange={e=>setFilterExam(e.target.value)}>
+            <option value="All">All Exams</option>
+            {exams.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}
+          </select>
+        </div>
+        <div style={{background:"#fff",borderRadius:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)",overflow:"hidden"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr style={{background:"#f8fafc"}}>
+                {["Student","Reg Number","Class","Exam","Score","Status","Date","Actions"].map(h=>(
+                  <th key={h} style={{padding:"12px 16px",textAlign:"left",fontSize:12,fontWeight:700,color:"#64748b",textTransform:"uppercase"}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => {
+                const s = students.find(x=>x.id===r.studentId);
+                const e = exams.find(x=>x.id===r.examId);
+                const pct = Math.round(r.score/r.total*100);
+                return (
+                  <tr key={r.id} style={{borderTop:"1px solid #f1f5f9"}}>
+                    <td style={{padding:"12px 16px",fontSize:14,fontWeight:600}}>{s?.fullName||"Unknown"}</td>
+                    <td style={{padding:"12px 16px",fontSize:13,color:"#1d4ed8"}}>{s?.regNumber||"—"}</td>
+                    <td style={{padding:"12px 16px"}}><Badge>{s?.className||"?"}</Badge></td>
+                    <td style={{padding:"12px 16px",fontSize:13}}>{e?.title||"Unknown"}</td>
+                    <td style={{padding:"12px 16px",fontSize:14,fontWeight:700}}>{r.score}/{r.total} <span style={{fontWeight:400,color:"#64748b"}}>({pct}%)</span></td>
+                    <td style={{padding:"12px 16px"}}><Badge color={pct>=50?"green":"red"}>{pct>=50?"Pass":"Fail"}</Badge></td>
+                    <td style={{padding:"12px 16px",fontSize:12,color:"#64748b"}}>{new Date(r.submittedAt).toLocaleDateString()}</td>
+                    <td style={{padding:"12px 16px"}}>
+                      <div style={{display:"flex",gap:6}}>
+                        <button title="View" style={{...btnGhost, padding: "4px 8px"}} onClick={()=>setViewResult(r)}>👁️</button>
+                        <button title="Download" style={{...btnGhost, padding: "4px 8px"}} onClick={()=>downloadResult(r)}>📥</button>
+                        <button title="Print" style={{...btnGhost, padding: "4px 8px"}} onClick={()=>printResult(r)}>🖨️</button>
+                        <button title="Delete" style={{...btnDanger, padding: "4px 8px"}} onClick={()=>deleteResult(r.id)}>🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length===0 && <tr><td colSpan={8} style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No results found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {viewResult && (() => {
@@ -1642,28 +1963,66 @@ function ResultsManagement({ results, students, exams, questions }) {
         const e = exams.find(x=>x.id===viewResult.examId);
         return (
           <Modal title="Result Detail" onClose={()=>setViewResult(null)} wide>
-            <div style={{marginBottom:16,padding:16,background:"#f8fafc",borderRadius:8}}>
-              <p style={{margin:"4px 0",fontSize:14}}><strong>Student:</strong> {s?.fullName} ({s?.regNumber})</p>
-              <p style={{margin:"4px 0",fontSize:14}}><strong>Exam:</strong> {e?.title}</p>
-              <p style={{margin:"4px 0",fontSize:14}}><strong>Score:</strong> {viewResult.score}/{viewResult.total} ({Math.round(viewResult.score/viewResult.total*100)}%)</p>
-              <p style={{margin:"4px 0",fontSize:14}}><strong>Submitted:</strong> {new Date(viewResult.submittedAt).toLocaleString()}</p>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:10}}>
-              {e?.questionIds.map((qid,i) => {
-                const q = questions.find(x=>x.id===qid);
-                if (!q) return null;
-                const given = viewResult.answers[qid];
-                const correct = q.correct;
-                return (
-                  <div key={qid} style={{padding:12,borderRadius:8,background:given===correct?"#f0fdf4":"#fef2f2",border:`1px solid ${given===correct?"#bbf7d0":"#fecaca"}`}}>
-                    <p style={{margin:"0 0 6px",fontSize:13,fontWeight:600}}>{i+1}. {q.text}</p>
-                    <p style={{margin:0,fontSize:13}}>
-                      Your answer: <strong style={{color:given===correct?"#16a34a":"#dc2626"}}>{q.options[given]||"Not answered"}</strong>
-                      {given!==correct && <> · Correct: <strong style={{color:"#16a34a"}}>{q.options[correct]}</strong></>}
-                    </p>
+            <div id="print-area">
+              <div style={{marginBottom:16,padding:16,background:"#f8fafc",borderRadius:8, border: "1px solid #e2e8f0"}}>
+                <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start"}}>
+                  <div>
+                    <h3 style={{margin: "0 0 10px", color: "#0f172a"}}>Individual Performance Report</h3>
+                    <p style={{margin:"4px 0",fontSize:14}}><strong>Student:</strong> {s?.fullName} ({s?.regNumber})</p>
+                    <p style={{margin:"4px 0",fontSize:14}}><strong>Class:</strong> {s?.className}</p>
+                    <p style={{margin:"4px 0",fontSize:14}}><strong>Exam:</strong> {e?.title} ({e?.subject})</p>
                   </div>
-                );
-              })}
+                  <div style={{textAlign: "right"}}>
+                    <div style={{fontSize: 24, fontWeight: 800, color: viewResult.score/viewResult.total >= 0.5 ? "#16a34a" : "#dc2626"}}>
+                      {Math.round(viewResult.score/viewResult.total*100)}%
+                    </div>
+                    <p style={{margin:0, fontSize: 12, color: "#64748b"}}>Score: {viewResult.score} / {viewResult.total}</p>
+                    <p style={{margin:0, fontSize: 12, color: "#64748b"}}>{new Date(viewResult.submittedAt).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                {e?.questionIds?.map((qid,i) => {
+                  const q = questions.find(x=>x.id===qid);
+                  if (!q) return null;
+                  const given = viewResult.answers ? viewResult.answers[qid] : null;
+                  const correct = q.correct_option || (q.options && q.options[q.correct]);
+                  
+                  // Handle different question formats (backend uses correct_option string, frontend might use correct index)
+                  const isCorrect = given === correct;
+                  
+                  return (
+                    <div key={qid} style={{padding:16,borderRadius:10,background:isCorrect?"#f0fdf4":"#fef2f2",border:`1px solid ${isCorrect?"#bbf7d0":"#fecaca"}`}}>
+                      <p style={{margin:"0 0 10px",fontSize:14,fontWeight:600,color: "#1e293b"}}>{i+1}. {q.question_text || q.text}</p>
+                      <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10}}>
+                        <div style={{fontSize:13}}>
+                          <span style={{color: "#64748b"}}>Student's Choice:</span><br/>
+                          <strong style={{color:isCorrect?"#16a34a":"#dc2626"}}>{given || "Not answered"}</strong>
+                        </div>
+                        {!isCorrect && (
+                          <div style={{fontSize:13}}>
+                            <span style={{color: "#64748b"}}>Correct Answer:</span><br/>
+                            <strong style={{color:"#16a34a"}}>{correct}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="no-print" style={{display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24}}>
+                <button style={btnGhost} onClick={() => printResult(viewResult)}>🖨️ Print Report</button>
+                <div style={{position: "relative", display: "inline-block"}}>
+                  <button style={btnPrimary} onClick={(e) => {
+                    const menu = e.currentTarget.nextSibling;
+                    menu.style.display = menu.style.display === "none" ? "block" : "none";
+                  }}>📥 Download Result</button>
+                  <div style={{display: "none", position: "absolute", bottom: "100%", right: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 100, minWidth: 120, marginBottom: 8}}>
+                    <button style={{width: "100%", padding: "8px 12px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f1f5f9"}} onClick={() => downloadResult(viewResult, "json")}>JSON Format</button>
+                    <button style={{width: "100%", padding: "8px 12px", textAlign: "left", background: "none", border: "none", cursor: "pointer", fontSize: 13}} onClick={() => downloadResult(viewResult, "csv")}>CSV Format</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </Modal>
         );
@@ -2073,7 +2432,6 @@ function Monitor({ students, exams }) {
     const t = setInterval(() => {
       try {
         const all = JSON.parse(localStorage.getItem(LIVE_SESSIONS_KEY) || "{}");
-        // filter out stale sessions (> 30s)
         const now = Date.now();
         const active = {};
         Object.entries(all).forEach(([sid, data]) => {
@@ -2086,55 +2444,83 @@ function Monitor({ students, exams }) {
   }, []);
 
   const list = Object.values(sessions);
+  const activeStudents = (students || []).filter(s => s.isActive);
+  const allTakingExams = activeStudents.length > 0 && activeStudents.every(as => list.some(ls => String(ls.studentId) === String(as.id)));
 
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-        <h1 style={{fontSize:24,fontWeight:800,color:"#0f172a",margin:0}}>Live Exam Monitor</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0 }}>Live Exam Monitor</h1>
         <Badge color="green">{list.length} Active Sessions</Badge>
       </div>
-      
+
       {list.length === 0 ? (
-        <div style={{background:"#fff",borderRadius:12,padding:48,textAlign:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-          <div style={{fontSize:48,marginBottom:16}}>📡</div>
-          <h3 style={{margin:0,color:"#0f172a"}}>No live sessions detected</h3>
-          <p style={{color:"#64748b",fontSize:14,marginTop:8}}>Students will appear here as soon as they start an exam.</p>
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
+        >
+          {allTakingExams ? (
+            <>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+              <h3 style={{ margin: 0, color: "#0f172a" }}>All active students are taking exams</h3>
+              <p style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>Excellent! Everyone who is currently active in the system is engaged in a session.</p>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>📡</div>
+              <h3 style={{ margin: 0, color: "#0f172a" }}>No live sessions detected</h3>
+              <p style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>Students will appear here as soon as they start an exam.</p>
+            </>
+          )}
         </div>
       ) : (
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:20}}>
-          {list.map(s => {
-            const urgent = s.timeLeft < 120;
-            const progress = Math.round(s.answered / s.total * 100);
-            return (
-              <div key={s.studentId} style={{background:"#fff",borderRadius:12,padding:20,boxShadow:"0 4px 12px rgba(0,0,0,0.08)",borderLeft:`4px solid ${urgent?"#dc2626":"#3b82f6"}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-                  <div>
-                    <div style={{fontSize:16,fontWeight:700,color:"#0f172a"}}>{s.studentName}</div>
-                    <div style={{fontSize:12,color:"#64748b"}}>{s.regNumber} · {s.className}</div>
+        <div>
+          {allTakingExams && (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span style={{ fontSize: 18 }}>🎉</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>All active students are taking exams</span>
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 20 }}>
+            {list.map(s => {
+              const urgent = s.timeLeft < 120;
+              const progress = Math.round(s.answered / s.total * 100);
+              return (
+                <div key={s.studentId} style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", borderLeft: `4px solid ${urgent ? "#dc2626" : "#3b82f6"}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{s.studentName}</div>
+                      <div style={{ fontSize: 12, color: "#64748b" }}>{s.regNumber} · {s.className}</div>
+                    </div>
+                    <div style={{ padding: "4px 8px", borderRadius: 6, background: urgent ? "#fef2f2" : "#f1f5f9", color: urgent ? "#dc2626" : "#64748b", fontSize: 12, fontWeight: 700 }}>
+                      {fmt(s.timeLeft)}
+                    </div>
                   </div>
-                  <div style={{padding:"4px 8px",borderRadius:6,background:urgent?"#fef2f2":"#f1f5f9",color:urgent?"#dc2626":"#64748b",fontSize:12,fontWeight:700}}>
-                    {fmt(s.timeLeft)}
+
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 4 }}>{s.examTitle}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
+                      <span>Progress: {s.answered}/{s.total}</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{ height: "100%", background: urgent ? "#ef4444" : "#3b82f6", width: `${progress}%`, transition: "width 0.5s" }} />
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+                    Currently on Question {s.currentQuestion}
                   </div>
                 </div>
-                
-                <div style={{marginBottom:16}}>
-                  <div style={{fontSize:13,fontWeight:600,color:"#334155",marginBottom:4}}>{s.examTitle}</div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#94a3b8",marginBottom:6}}>
-                    <span>Progress: {s.answered}/{s.total}</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div style={{height:6,background:"#f1f5f9",borderRadius:3,overflow:"hidden"}}>
-                    <div style={{height:"100%",background:urgent?"#ef4444":"#3b82f6",width:`${progress}%`,transition:"width 0.5s"}} />
-                  </div>
-                </div>
-                
-                <div style={{fontSize:12,color:"#64748b",display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{width:8,height:8,borderRadius:"50%",background:"#16a34a",display:"inline-block"}} />
-                  Currently on Question {s.currentQuestion}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -2352,14 +2738,45 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   }, [exam.id, exam.randomizeQuestions, JSON.stringify(ids)]);
   const qs = ordered.map(id => questions.find(q => q.id === id)).filter(Boolean);
  
-  const [answers, setAnswers] = useState({});
-  const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState((exam.duration_minutes || exam.duration || 30) * 60);
+  const [answers, setAnswers] = useState(exam.initialAnswers || {});
+  const [current, setCurrent] = useState(exam.initialIndex || 0);
+  const [timeLeft, setTimeLeft] = useState(exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60);
   const [confirmed, setConfirmed] = useState(false);
   const submitted = useRef(false);
   const [errorMsg, setErrorMsg] = useState("");
   const startedAt = useRef(Date.now()).current;
  
+  // ── Incremental Saving (Heartbeat Sync) ───────────────────────────────────────
+  const syncTimeoutRef = useRef(null);
+  const lastSyncedAnswersRef = useRef(JSON.stringify(exam.initialAnswers || {}));
+
+  const syncProgress = useCallback(async (currentAnswers, currentIndex) => {
+    const answersStr = JSON.stringify(currentAnswers);
+    if (answersStr === lastSyncedAnswersRef.current) return;
+
+    try {
+      await api.syncExamSession(Number(exam.id), {
+        current_question_index: currentIndex,
+        answers_provided: currentAnswers
+      });
+      lastSyncedAnswersRef.current = answersStr;
+    } catch (e) {
+      // Silently fail sync, will retry on next interaction
+    }
+  }, [exam.id]);
+
+  useEffect(() => {
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    
+    syncTimeoutRef.current = setTimeout(() => {
+      syncProgress(answers, current);
+    }, 2000); // 2 second debounce
+
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [answers, current, syncProgress]);
+
   // ── Live broadcast: fires whenever timeLeft / answers / current changes ───────
   useEffect(() => {
     broadcastSession({
@@ -2384,29 +2801,34 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
     return () => clearSession(student.id);
   }, []);
  
-  const doSubmit = useCallback(() => {
+  const doSubmit = useCallback(async () => {
     if (submitted.current) return;
     submitted.current = true;
-    clearSession(student.id);                                   // ← remove from live board
- 
-    let score = 0;
-    let blankError = false;
-    qs.forEach(q => {
-      const a = answers[q.id];
-      if (!q.type || q.type === "mcq") {
-        const correctIndex = q.correct_option ? (q.correct_option.charCodeAt(0) - 65) : q.correct;
-        if (a === correctIndex) score++;
-      } else if (q.type === "fib") {
-        if (typeof a !== "string" || a.trim() === "") { blankError = true; return; }
-        if ((q.answer || "").trim().toLowerCase() === a.trim().toLowerCase()) score++;
-      } else if (q.type === "boolean") {
-        const expected = q.answerBool === true ? "true" : "false";
-        if ((typeof a === "string" ? a.trim().toLowerCase() : "") === expected) score++;
-      }
-    });
-    if (blankError) { setErrorMsg("Please fill all blanks before submitting."); submitted.current = false; return; }
-    onSubmit({ score, total: qs.length, answers, questionIds: qs.map(q => q.id) });
-  }, [answers, qs, onSubmit]);
+    
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+
+    try {
+      clearSession(student.id);                                   // ← remove from live board
+  
+      let score = 0;
+      qs.forEach(q => {
+        const a = answers[q.id];
+        if (!q.type || q.type === "mcq") {
+          const correctIndex = q.correct_option ? (q.correct_option.charCodeAt(0) - 65) : q.correct;
+          if (a === correctIndex) score++;
+        } else if (q.type === "fib") {
+          if ((q.answer || "").trim().toLowerCase() === (typeof a === "string" ? a.trim().toLowerCase() : "")) score++;
+        } else if (q.type === "boolean") {
+          const expected = q.answerBool === true ? "true" : "false";
+          if ((typeof a === "string" ? a.trim().toLowerCase() : "") === expected) score++;
+        }
+      });
+      await onSubmit({ score, total: qs.length, answers, questionIds: qs.map(q => q.id) });
+    } catch (e) {
+      submitted.current = false;
+      // error is already alerted in handleSubmit in StudentPortal
+    }
+  }, [answers, qs, onSubmit, student.id]);
  
   useEffect(() => {
     const t = setInterval(() => {
@@ -2421,8 +2843,22 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   const q = qs[current];
   const answered = Object.keys(answers).length;
   const pct = Math.round(answered / qs.length * 100);
-  const urgent = timeLeft < 120;
+  const urgent = timeLeft < 300; // < 5 mins
  
+  const handleConfirmSubmit = () => {
+    let hasBlank = false;
+    qs.forEach(q => {
+      const a = answers[q.id];
+      if (q.type === "fib" && (typeof a !== "string" || a.trim() === "")) hasBlank = true;
+      else if (a === undefined || a === null) hasBlank = true;
+    });
+
+    if (hasBlank) {
+      if (!confirm("You have unanswered questions. Are you sure you want to proceed to the submission screen?")) return;
+    }
+    setConfirmed(true);
+  };
+
   if (!q) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>No questions available.</div>;
  
   if (confirmed) return (
@@ -2456,7 +2892,7 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
             <div style={{ fontSize: 10, color: urgent ? "#fca5a5" : "#64748b", textTransform: "uppercase" }}>Time Left</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: urgent ? "#fff" : "#60a5fa", fontVariantNumeric: "tabular-nums" }}>{fmt(timeLeft)}</div>
           </div>
-          <button onClick={() => setConfirmed(true)} style={{ ...btnPrimary, background: "#16a34a" }}>Submit Exam</button>
+          <button onClick={handleConfirmSubmit} style={{ ...btnPrimary, background: "#16a34a" }}>Submit Exam</button>
         </div>
       </div>
       <div style={{ height: 4, background: "#1e293b" }}>
@@ -2467,25 +2903,69 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, boxShadow: "0 2px 8px rgba(0,0,0,0.06)", marginBottom: 20 }}>
             <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>Question {current + 1} of {qs.length}</div>
             <p style={{ fontSize: 17, fontWeight: 600, color: "#0f172a", lineHeight: 1.6, margin: "0 0 24px" }}>{q.text}</p>
+            
+            {/* MCQ Question Type */}
             {(!q.type || q.type === "mcq") && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div 
+                role="radiogroup" 
+                aria-label="Multiple choice options"
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
                 {q.options.map((o, i) => {
                   const sel = answers[q.id] === i;
+                  const label = String.fromCharCode(65 + i);
                   return (
-                    <button key={i} onClick={() => setAnswers(a => ({ ...a, [q.id]: i }))} style={{ padding: "14px 18px", borderRadius: 10, border: `2px solid ${sel ? "#3b82f6" : "#e2e8f0"}`, background: sel ? "#eff6ff" : "#fff", cursor: "pointer", textAlign: "left", fontSize: 14, color: sel ? "#1d4ed8" : "#334155", fontWeight: sel ? 600 : 400, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 14 }}>
-                      <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: sel ? "#3b82f6" : "#f1f5f9", color: sel ? "#fff" : "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>{sel ? "✓" : String.fromCharCode(65 + i)}</span>
+                    <button 
+                      key={i} 
+                      onClick={() => setAnswers(a => ({ ...a, [q.id]: i }))} 
+                      aria-checked={sel}
+                      role="radio"
+                      style={{ padding: "14px 18px", borderRadius: 10, border: `2px solid ${sel ? "#3b82f6" : "#e2e8f0"}`, background: sel ? "#eff6ff" : "#fff", cursor: "pointer", textAlign: "left", fontSize: 14, color: sel ? "#1d4ed8" : "#334155", fontWeight: sel ? 600 : 400, transition: "all 0.15s", display: "flex", alignItems: "center", gap: 14 }}
+                    >
+                      <span style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, background: sel ? "#3b82f6" : "#f1f5f9", color: sel ? "#fff" : "#64748b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>{sel ? "✓" : label}</span>
                       {o}
                     </button>
                   );
                 })}
               </div>
             )}
-            {q.type === "fib" && <input style={inputStyle} value={answers[q.id] || ""} onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} placeholder="Type your answer" />}
+
+            {/* Fill-in-the-blank Question Type */}
+            {q.type === "fib" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label htmlFor={`q-${q.id}`} style={{ fontSize: 13, color: "#64748b" }}>Your Answer:</label>
+                <input 
+                  id={`q-${q.id}`}
+                  style={{ ...inputStyle, width: "100%", maxWidth: 400 }} 
+                  value={answers[q.id] || ""} 
+                  onChange={e => setAnswers(a => ({ ...a, [q.id]: e.target.value }))} 
+                  placeholder="Type your answer here..." 
+                  aria-required="true"
+                />
+              </div>
+            )}
+
+            {/* True/False Question Type */}
             {q.type === "boolean" && (
-              <div style={{ display: "flex", gap: 10 }}>
+              <div 
+                role="radiogroup" 
+                aria-label="True or False"
+                style={{ display: "flex", gap: 12 }}
+              >
                 {["True", "False"].map(v => {
-                  const sel = (answers[q.id] || "") === v.toLowerCase();
-                  return <button key={v} onClick={() => setAnswers(a => ({ ...a, [q.id]: v.toLowerCase() }))} style={{ padding: "12px 16px", borderRadius: 10, border: `2px solid ${sel ? "#3b82f6" : "#e2e8f0"}`, background: sel ? "#eff6ff" : "#fff", cursor: "pointer", fontSize: 14, color: sel ? "#1d4ed8" : "#334155", fontWeight: sel ? 600 : 400 }}>{v}</button>;
+                  const val = v.toLowerCase();
+                  const sel = (answers[q.id] || "") === val;
+                  return (
+                    <button 
+                      key={v} 
+                      onClick={() => setAnswers(a => ({ ...a, [q.id]: val }))} 
+                      role="radio"
+                      aria-checked={sel}
+                      style={{ padding: "14px 24px", minWidth: 120, borderRadius: 10, border: `2px solid ${sel ? "#3b82f6" : "#e2e8f0"}`, background: sel ? "#eff6ff" : "#fff", cursor: "pointer", fontSize: 14, color: sel ? "#1d4ed8" : "#334155", fontWeight: sel ? 600 : 400, transition: "all 0.15s" }}
+                    >
+                      {v}
+                    </button>
+                  );
                 })}
               </div>
             )}
@@ -2499,7 +2979,7 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
           <p style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 700, color: "#374151" }}>Question Navigator</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 6, marginBottom: 16 }}>
             {qs.map((qq, i) => {
-              const done = answers[qq.id] !== undefined;
+              const done = answers[qq.id] !== undefined && (typeof answers[qq.id] !== "string" || answers[qq.id].trim() !== "");
               const isCurrent = i === current;
               return <button key={i} onClick={() => setCurrent(i)} style={{ padding: "8px 0", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: isCurrent ? "#3b82f6" : done ? "#dcfce7" : "#f1f5f9", color: isCurrent ? "#fff" : done ? "#16a34a" : "#64748b" }}>{i + 1}</button>;
             })}
@@ -2559,51 +3039,100 @@ function StudentPortal({ student, onLogout }) {
   const [examQuestions, setExamQuestions] = useState([]);
   const [lastResult, setLastResult] = useState(null);
   const [submitFeedback, setSubmitFeedback] = useState("");
+  const [initialSession, setInitialSession] = useState(null);
+
+  const checkSession = useCallback(async () => {
+    try {
+      const res = await api.checkActiveSession();
+      if (res.session) {
+        setInitialSession(res);
+        // Start the exam flow with this session
+        await startExam(res.session.exam, res);
+      }
+    } catch (e) {
+      console.error("Failed to check session", e);
+    }
+  }, []);
 
   const fetchExams = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.listStudentExams();
       setExams(res.data);
+      await checkSession();
     } catch (e) {
       setError("Failed to load exams.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [checkSession]);
 
   useEffect(() => {
     fetchExams();
   }, [fetchExams]);
 
-  const startExam = async exam => {
+  const startExam = async (exam, sessionData = null) => {
     try {
       const res = await api.getStudentExam(Number(exam.id));
       const data = res.data;
+      
+      let remainingSeconds = (data.duration_minutes || 30) * 60;
+      let initialAnswers = {};
+      let initialIndex = 0;
+
+      if (sessionData) {
+        remainingSeconds = sessionData.remaining_seconds;
+        initialAnswers = sessionData.session.answers_provided || {};
+        initialIndex = sessionData.session.current_question_index || 0;
+      } else {
+        const startRes = await api.startExamSession(Number(exam.id));
+        remainingSeconds = startRes.remaining_seconds;
+      }
+
       const mappedExam = {
         ...data,
         duration: data.duration_minutes,
+        remainingSeconds,
+        initialAnswers,
+        initialIndex,
         questionIds: (data.questions || []).map(q => String(q.id))
       };
       const mappedQuestions = (data.questions || []).map(q => ({
         id: String(q.id),
         text: q.question_text,
-        options: [q.option_a, q.option_b, q.option_c, q.option_d]
+        options: [q.option_a, q.option_b, q.option_c, q.option_d],
+        type: q.type || "mcq",
+        correct_option: q.correct_option,
       }));
       setActiveExam(mappedExam);
       setExamState("taking");
       setExamQuestions(mappedQuestions);
-    } catch {
+    } catch (e) {
+      console.error(e);
       alert("Failed to load exam details.");
     }
   };
 
   const handleSubmit = async ({ answers }) => {
     const payload = {
-      answers: Object.entries(answers).map(([qid, sel]) => ({
-        question_id: Number(qid),
-        selected_option: String.fromCharCode(65 + Number(sel)) // Convert 0 to A, 1 to B, etc.
-      }))
+      answers: Object.entries(answers).map(([qid, sel]) => {
+        const q = examQuestions.find(x => x.id === qid);
+        let selected_option = sel;
+        
+        // If it's an MCQ (or no type specified), convert index to A/B/C/D
+        if (!q?.type || q.type === "mcq") {
+          selected_option = String.fromCharCode(65 + Number(sel));
+        } else if (q.type === "boolean") {
+          // Boolean: map 'true' -> 'A', 'false' -> 'B' (matching typical implementation)
+          selected_option = sel === "true" ? "A" : "B";
+        }
+        // For FIB, we send the string as is (backend handles it)
+
+        return {
+          question_id: Number(qid),
+          selected_option: String(selected_option)
+        };
+      })
     };
     try {
       const res = await api.submitExam(Number(activeExam.id), payload);
@@ -2900,17 +3429,24 @@ function AppContent() {
       // Map Laravel resources back to what the frontend expects
       const mappedQs = (qs.data || []).map(q => ({
         id: String(q.id),
+        subject: q.subject,
+        class_name: q.class_name,
+        type: q.type || "mcq",
         question_text: q.question_text,
         option_a: q.option_a,
         option_b: q.option_b,
         option_c: q.option_c,
         option_d: q.option_d,
-        correct_option: q.correct_option
+        correct_option: q.correct_option,
+        answer: q.answer,
+        answerBool: q.answerBool
       }));
 
       const mappedEs = (es.data || []).map(e => ({
         id: String(e.id),
         title: e.title,
+        subject: e.subject || "",
+        class_name: e.class_name || "SS3",
         description: e.description,
         duration_minutes: e.duration_minutes,
         question_ids: (e.questions || []).map(q => String(q.id)),
@@ -2925,7 +3461,8 @@ function AppContent() {
         regNumber: s.registration_number,
         email: s.email,
         className: s.class_name || "SS3", // Default if not in backend
-        gender: s.gender || ""
+        gender: s.gender || "",
+        isActive: Boolean(s.is_active)
       }));
 
       const mappedUs = us ? (us.data || []).map(u => ({

@@ -19,8 +19,8 @@ class StudentAuthController extends Controller
         $password = $request->validated('password') ?? 'password123';
 
         $student = Student::query()
-            ->where('registration_number', $login)
-            ->orWhere('email', $login)
+            ->where('registration_number', 'LIKE', $login)
+            ->orWhere('email', 'LIKE', $login)
             ->first();
 
         if ($student === null || ! Hash::check($password, $student->password)) {
@@ -30,6 +30,9 @@ class StudentAuthController extends Controller
         if (!$student->is_active) {
             return response()->json(['message' => 'Your account is deactivated.'], 403);
         }
+
+        // Force logout from other devices
+        $student->tokens()->delete();
 
         $token = $student->createToken('student-token', ['student'])->plainTextToken;
 

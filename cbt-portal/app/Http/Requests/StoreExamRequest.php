@@ -17,6 +17,8 @@ class StoreExamRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'class_name' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'duration_minutes' => ['required', 'integer', 'min:1'],
             'starts_at' => ['nullable', 'date'],

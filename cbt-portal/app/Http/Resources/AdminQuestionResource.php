@@ -13,12 +13,17 @@ class AdminQuestionResource extends JsonResource
     {
         return [
             'id' => $this->resource->id,
+            'subject' => $this->resource->subject,
+            'class_name' => $this->resource->class_name,
+            'type' => $this->resource->type,
             'question_text' => $this->resource->question_text,
             'option_a' => $this->resource->option_a,
             'option_b' => $this->resource->option_b,
             'option_c' => $this->resource->option_c,
             'option_d' => $this->resource->option_d,
             'correct_option' => $this->resource->correct_option,
+            'answer' => $this->resource->answer,
+            'answerBool' => (bool) $this->resource->answerBool,
             'created_at' => $this->resource->created_at,
             'updated_at' => $this->resource->updated_at,
         ];

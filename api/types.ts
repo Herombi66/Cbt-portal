@@ -18,6 +18,8 @@ export interface Student {
 
 export interface Question {
   id: number
+  subject: string
+  class_name: string
   question_text: string
   option_a: string
   option_b: string
@@ -49,6 +51,7 @@ export interface Result {
   score: number
   total_questions: number
   submitted_at: string
+  answers?: { question_id: number; selected_option: string; is_correct: boolean }[]
 }
 
 export interface Paginated<T> {

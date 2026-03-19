@@ -129,6 +129,9 @@ class AdminController extends Controller
         ]);
 
         $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        if (isset($validated['class_name'])) {
+            $validated['class_name'] = trim((string) $validated['class_name']);
+        }
         $student = \App\Models\Student::query()->create($validated);
 
         return response()->json(['data' => new \App\Http\Resources\StudentResource($student)], 201);
@@ -147,6 +150,10 @@ class AdminController extends Controller
 
         if (isset($validated['password'])) {
             $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        }
+
+        if (isset($validated['class_name'])) {
+            $validated['class_name'] = trim((string) $validated['class_name']);
         }
 
         $student->update($validated);
@@ -210,7 +217,13 @@ class AdminController extends Controller
 
     public function resultsIndex(): JsonResponse
     {
-        return response()->json(['data' => \App\Models\ExamResult::query()->latest()->get()]);
+        return response()->json(['data' => \App\Models\ExamResult::query()->with('answers')->latest()->get()]);
+    }
+
+    public function resultsDestroy(\App\Models\ExamResult $result): JsonResponse
+    {
+        $result->delete();
+        return response()->json(['message' => 'Result deleted.']);
     }
 
     public function getSystemSettings(): JsonResponse

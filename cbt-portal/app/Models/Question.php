@@ -15,12 +15,17 @@ class Question extends Model
     protected $table = 'questions';
 
     protected $fillable = [
+        'subject',
+        'class_name',
+        'type',
         'question_text',
         'option_a',
         'option_b',
         'option_c',
         'option_d',
         'correct_option',
+        'answer',
+        'answerBool',
     ];
 
     public function exams(): BelongsToMany

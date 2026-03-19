@@ -35,6 +35,7 @@ Route::prefix('admin')->group(function (): void {
         Route::delete('students/{student}', [AdminController::class, 'studentsDestroy']);
 
         Route::get('results', [AdminController::class, 'resultsIndex']);
+        Route::delete('results/{result}', [AdminController::class, 'resultsDestroy']);
 
         Route::middleware(['role:super_admin'])->group(function (): void {
             Route::get('system-settings', [AdminController::class, 'getSystemSettings']);
@@ -56,7 +57,10 @@ Route::prefix('student')->group(function (): void {
         Route::post('logout', [StudentAuthController::class, 'logout']);
 
         Route::get('exams', [ExamController::class, 'index']);
+        Route::get('active-session', [ExamController::class, 'checkActiveSession']);
         Route::get('exams/{exam}', [ExamController::class, 'show']);
+        Route::post('exams/{exam}/start-session', [ExamController::class, 'startSession']);
+        Route::post('exams/{exam}/sync-session', [ExamController::class, 'syncSession']);
         Route::post('exams/{exam}/submit', [ExamController::class, 'submit']);
     });
 });

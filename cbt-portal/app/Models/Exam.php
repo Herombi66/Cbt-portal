@@ -17,6 +17,8 @@ class Exam extends Model
 
     protected $fillable = [
         'title',
+        'subject',
+        'class_name',
         'description',
         'duration_minutes',
         'starts_at',

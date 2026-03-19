@@ -112,6 +112,10 @@ export async function listResults(): Promise<{ data: Result[] }> {
   return data
 }
 
+export async function deleteResult(id: number): Promise<void> {
+  await api.delete(`/admin/results/${id}`)
+}
+
 // --- Super Admin: System Control ---
 
 export async function getSystemSettings(): Promise<{ settings: Record<string, string>; global_active: boolean }> {
@@ -163,6 +167,20 @@ export async function getStudentExam(id: number): Promise<{ data: Exam }> {
 export async function submitExam(examId: number, payload: { answers: { question_id: number; selected_option: string }[] }): Promise<{ data: Result }> {
   const { data } = await api.post<{ data: Result }>(`/student/exams/${examId}/submit`, payload)
   return data
+}
+
+export async function checkActiveSession(): Promise<{ session: any; remaining_seconds?: number }> {
+  const { data } = await api.get<{ session: any; remaining_seconds?: number }>('/student/active-session')
+  return data
+}
+
+export async function startExamSession(examId: number): Promise<{ session: any; remaining_seconds: number }> {
+  const { data } = await api.post<{ session: any; remaining_seconds: number }>(`/student/exams/${examId}/start-session`)
+  return data
+}
+
+export async function syncExamSession(examId: number, payload: { current_question_index: number; answers_provided: any }): Promise<void> {
+  await api.post(`/student/exams/${examId}/sync-session`, payload)
 }
 
 export type { AdminLoginResponse, Student, Exam, Result, Paginated, Question, AdminUser }

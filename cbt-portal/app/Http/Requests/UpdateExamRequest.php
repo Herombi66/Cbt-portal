@@ -17,6 +17,8 @@ class UpdateExamRequest extends FormRequest
     {
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
+            'subject' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'class_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
             'duration_minutes' => ['sometimes', 'required', 'integer', 'min:1'],
             'starts_at' => ['sometimes', 'nullable', 'date'],

@@ -16,11 +16,103 @@ use App\Models\Student;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Models\ExamSession;
+use Carbon\Carbon;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 
 class ExamController extends Controller
 {
+    public function startSession(Request $request, Exam $exam): JsonResponse
+    {
+        $now = CarbonImmutable::now();
+        if (! $this->examIsActive($exam, $now)) {
+            return response()->json(['message' => 'Exam is not available.'], 422);
+        }
+
+        /** @var Student $student */
+        $student = $request->user();
+
+        $session = ExamSession::query()
+            ->where('student_id', $student->id)
+            ->where('exam_id', $exam->id)
+            ->where('status', 'in_progress')
+            ->first();
+
+        if (! $session) {
+            $session = ExamSession::query()->create([
+                'student_id' => $student->id,
+                'exam_id' => $exam->id,
+                'status' => 'in_progress',
+                'start_time' => $now,
+                'current_question_index' => 0,
+                'answers_provided' => [],
+            ]);
+        }
+
+        $durationSeconds = $exam->duration_minutes * 60;
+        $elapsedSeconds = $now->diffInSeconds($session->start_time);
+        $remainingSeconds = max(0, $durationSeconds - $elapsedSeconds);
+
+        return response()->json([
+            'session' => $session,
+            'remaining_seconds' => $remainingSeconds,
+        ]);
+    }
+
+    public function syncSession(Request $request, Exam $exam): JsonResponse
+    {
+        /** @var Student $student */
+        $student = $request->user();
+
+        $session = ExamSession::query()
+            ->where('student_id', $student->id)
+            ->where('exam_id', $exam->id)
+            ->where('status', 'in_progress')
+            ->firstOrFail();
+
+        $session->update([
+            'current_question_index' => $request->integer('current_question_index'),
+            'answers_provided' => $request->input('answers_provided'),
+            'last_synced_at' => CarbonImmutable::now(),
+        ]);
+
+        return response()->json(['message' => 'Synced.']);
+    }
+
+    public function checkActiveSession(Request $request): JsonResponse
+    {
+        /** @var Student $student */
+        $student = $request->user();
+
+        $session = ExamSession::query()
+            ->with('exam')
+            ->where('student_id', $student->id)
+            ->where('status', 'in_progress')
+            ->first();
+
+        if ($session) {
+            $now = CarbonImmutable::now();
+            $durationSeconds = $session->exam->duration_minutes * 60;
+            $elapsedSeconds = $now->diffInSeconds($session->start_time);
+            $remainingSeconds = max(0, $durationSeconds - $elapsedSeconds);
+
+            if ($remainingSeconds <= 0) {
+                // Session expired, mark as completed but don't auto-submit result here
+                // Client should handle the transition
+                $session->update(['status' => 'completed']);
+                return response()->json(['session' => null]);
+            }
+
+            return response()->json([
+                'session' => $session,
+                'remaining_seconds' => $remainingSeconds,
+            ]);
+        }
+
+        return response()->json(['session' => null]);
+    }
+
     private function examIsActive(Exam $exam, CarbonImmutable $now): bool
     {
         if (! $exam->is_active) {
@@ -48,7 +140,14 @@ class ExamController extends Controller
             ->where('is_active', true)
             ->where(function ($q) use ($student): void {
                 if ($student && $student->class_name) {
-                    $q->whereNull('class_name')->orWhere('class_name', $student->class_name);
+                    $class = trim((string) $student->class_name);
+                    $q->where(function ($sq) use ($class): void {
+                        $sq->whereNull('class_name')
+                           ->orWhere('class_name', '')
+                           ->orWhere('class_name', 'LIKE', $class);
+                    });
+                } else {
+                    $q->whereNull('class_name')->orWhere('class_name', '');
                 }
             })
             ->where(function ($q) use ($now): void {
@@ -59,7 +158,7 @@ class ExamController extends Controller
             })
             ->withCount('questions')
             ->latest()
-            ->get(); // Use get() instead of paginate for student portal list
+            ->get();
 
         return ExamResource::collection($exams);
     }
@@ -130,7 +229,21 @@ class ExamController extends Controller
 
             foreach ($exam->questions as $question) {
                 $selected = $answersByQuestionId[(int) $question->id] ?? '';
-                $isCorrect = strtoupper($selected) === strtoupper((string) $question->correct_option);
+                $isCorrect = false;
+
+                if ($question->type === 'fib') {
+                    $isCorrect = trim(strtolower((string) $selected)) === trim(strtolower((string) $question->answer));
+                } elseif ($question->type === 'boolean') {
+                    $val = strtoupper(trim((string) $selected));
+                    if ($val === 'A') {
+                        $isCorrect = (bool) $question->answerBool;
+                    } elseif ($val === 'B') {
+                        $isCorrect = ! ((bool) $question->answerBool);
+                    }
+                } else {
+                    // Default to MCQ
+                    $isCorrect = strtoupper((string) $selected) === strtoupper((string) $question->correct_option);
+                }
 
                 if ($isCorrect) {
                     $score++;
@@ -139,13 +252,20 @@ class ExamController extends Controller
                 ExamAnswer::query()->create([
                     'exam_result_id' => $result->id,
                     'question_id' => $question->id,
-                    'selected_option' => strtoupper($selected),
+                    'selected_option' => substr(strtoupper((string) $selected), 0, 255),
                     'is_correct' => $isCorrect,
                 ]);
             }
 
             $result->score = $score;
             $result->save();
+
+            // Mark session as completed
+            ExamSession::query()
+                ->where('student_id', $student->id)
+                ->where('exam_id', $exam->id)
+                ->where('status', 'in_progress')
+                ->update(['status' => 'completed']);
 
             return $result->load(['exam', 'answers']);
         });

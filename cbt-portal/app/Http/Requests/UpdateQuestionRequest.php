@@ -17,12 +17,17 @@ class UpdateQuestionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'subject' => ['sometimes', 'required', 'string'],
+            'class_name' => ['sometimes', 'required', 'string'],
             'question_text' => ['sometimes', 'required', 'string'],
-            'option_a' => ['sometimes', 'required', 'string'],
-            'option_b' => ['sometimes', 'required', 'string'],
-            'option_c' => ['sometimes', 'required', 'string'],
-            'option_d' => ['sometimes', 'required', 'string'],
-            'correct_option' => ['sometimes', 'required', 'string', Rule::in(['A', 'B', 'C', 'D'])],
+            'type' => ['sometimes', 'string', Rule::in(['mcq', 'fib', 'boolean'])],
+            'option_a' => ['sometimes', 'required_if:type,mcq', 'nullable', 'string'],
+            'option_b' => ['sometimes', 'required_if:type,mcq', 'nullable', 'string'],
+            'option_c' => ['sometimes', 'required_if:type,mcq', 'nullable', 'string'],
+            'option_d' => ['sometimes', 'required_if:type,mcq', 'nullable', 'string'],
+            'correct_option' => ['sometimes', 'required_if:type,mcq', 'nullable', 'string', Rule::in(['A', 'B', 'C', 'D'])],
+            'answer' => ['sometimes', 'required_if:type,fib', 'nullable', 'string'],
+            'answerBool' => ['sometimes', 'required_if:type,boolean', 'nullable', 'boolean'],
         ];
     }
 }

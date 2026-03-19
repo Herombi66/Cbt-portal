@@ -13,6 +13,7 @@ class StudentQuestionResource extends JsonResource
     {
         return [
             'id' => $this->resource->id,
+            'type' => $this->resource->type,
             'question_text' => $this->resource->question_text,
             'option_a' => $this->resource->option_a,
             'option_b' => $this->resource->option_b,
