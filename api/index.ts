@@ -116,6 +116,11 @@ export async function deleteResult(id: number): Promise<void> {
   await api.delete(`/admin/results/${id}`)
 }
 
+export async function listActiveSessions(): Promise<{ data: any[] }> {
+  const { data } = await api.get<{ data: any[] }>('/admin/active-sessions')
+  return data
+}
+
 // --- Super Admin: System Control ---
 
 export async function getSystemSettings(): Promise<{ settings: Record<string, string>; global_active: boolean }> {

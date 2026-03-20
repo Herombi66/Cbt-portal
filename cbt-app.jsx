@@ -1507,11 +1507,12 @@ function QuestionManagement({ questions, setQuestions, toast }) {
   const deleteSelected = async () => {
     if (!confirm(`Delete ${selected.length} selected questions?`)) return;
     try {
-      await Promise.all(selected.map(id => api.deleteQuestion(id)));
+      await Promise.all(selected.map(id => api.deleteQuestion(Number(id))));
       setQuestions(qs => qs.filter(q => !selected.includes(q.id)));
       setSelected([]);
       toast.success("Selected questions deleted.");
-    } catch {
+    } catch (e) {
+      console.error("[Delete Selected Error]", e);
       toast.error("Failed to delete some questions.");
     }
   };
@@ -2031,35 +2032,58 @@ function ResultsManagement({ results, students, exams, questions }) {
   );
 }
 function LiveMonitor({ students, exams }) {
-  const [sessions, setSessions] = useState({});
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterExam, setFilterExam] = useState("All");
   const [tick, setTick] = useState(0);           // forces re-render for elapsed times
-  const STALE_MS = 12000;                        // remove session if no heartbeat for 12 s
  
-  // Poll localStorage every 3 seconds
+  // Poll backend every 5 seconds
   useEffect(() => {
-    const poll = () => {
+    const fetchSessions = async () => {
       try {
-        const raw = JSON.parse(localStorage.getItem(LIVE_SESSIONS_KEY) || "{}");
-        const now = Date.now();
-        // Prune stale sessions (student closed tab / submitted without cleanup)
-        const active = Object.fromEntries(
-          Object.entries(raw).filter(([, v]) => now - v.lastSeen < STALE_MS)
-        );
-        // Write back pruned set so it stays clean
-        if (Object.keys(active).length !== Object.keys(raw).length) {
-          localStorage.setItem(LIVE_SESSIONS_KEY, JSON.stringify(active));
-        }
-        setSessions(active);
+        const res = await api.listActiveSessions();
+        const now = new Date();
+        
+        // Map backend sessions to frontend format
+        const mapped = res.data.map(s => {
+          const startTime = new Date(s.start_time);
+          const durationSeconds = (s.exam?.duration_minutes || 30) * 60;
+          const elapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+          const timeLeft = Math.max(0, durationSeconds - elapsedSeconds);
+          const answeredCount = Object.keys(s.answers_provided || {}).length;
+          const totalQuestions = (s.exam?.question_ids || []).length || 1; // fallback to 1 to avoid div by 0
+
+          return {
+            studentId: s.student_id,
+            studentName: s.student?.name || "Unknown",
+            regNumber: s.student?.registration_number || "N/A",
+            className: s.student?.class_name || "N/A",
+            examId: s.exam_id,
+            examTitle: s.exam?.title || "Unknown Exam",
+            timeLeft: timeLeft,
+            totalTime: durationSeconds,
+            answered: answeredCount,
+            total: totalQuestions,
+            currentQuestion: (s.current_question_index || 0) + 1,
+            lastSeen: new Date(s.last_synced_at || s.updated_at).getTime(),
+            startedAt: startTime.getTime(),
+          };
+        });
+
+        setSessions(mapped);
+        setLoading(false);
         setTick(t => t + 1);
-      } catch {}
+      } catch (e) {
+        console.error("Failed to fetch live sessions", e);
+      }
     };
-    poll();
-    const id = setInterval(poll, 3000);
+
+    fetchSessions();
+    const id = setInterval(fetchSessions, 5000);
     return () => clearInterval(id);
   }, []);
  
-  const sessionList = Object.values(sessions);
+  const sessionList = sessions;
   const activeExamIds = [...new Set(sessionList.map(s => s.examId))];
   const filtered = filterExam === "All" ? sessionList : sessionList.filter(s => s.examId === filterExam);
  
@@ -2085,7 +2109,7 @@ function LiveMonitor({ students, exams }) {
             Live Exam Monitor
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
-            Updates every 3 seconds · Showing students currently taking exams
+            Updates every 5 seconds · Showing students currently taking exams
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2093,7 +2117,7 @@ function LiveMonitor({ students, exams }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: sessionList.length > 0 ? "#f0fdf4" : "#f8fafc", border: `1px solid ${sessionList.length > 0 ? "#86efac" : "#e2e8f0"}`, borderRadius: 20, padding: "6px 14px" }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: sessionList.length > 0 ? "#16a34a" : "#94a3b8", display: "inline-block", animation: sessionList.length > 0 ? "pulse-dot 1.5s ease infinite" : "none" }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: sessionList.length > 0 ? "#16a34a" : "#94a3b8" }}>
-              {sessionList.length > 0 ? `${sessionList.length} Active` : "No active sessions"}
+              {loading ? "Loading..." : (sessionList.length > 0 ? `${sessionList.length} Active` : "No active sessions")}
             </span>
           </div>
           {urgentCount > 0 && (
@@ -2145,7 +2169,7 @@ function LiveMonitor({ students, exams }) {
       )}
  
       {/* Empty state */}
-      {sessionList.length === 0 && (
+      {!loading && sessionList.length === 0 && (
         <div style={{ background: "#fff", borderRadius: 16, padding: "60px 40px", textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>👀</div>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 8px" }}>No Students Taking Exams</h3>
@@ -2199,8 +2223,8 @@ function LiveMonitor({ students, exams }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: heartbeatAge < 6 ? "#16a34a" : "#f59e0b", display: "inline-block", animation: "pulse-dot 1.5s ease infinite" }} />
-                    <span style={{ fontSize: 11, color: "#64748b" }}>{heartbeatAge < 6 ? "Live" : `${heartbeatAge}s ago`}</span>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: heartbeatAge < 15 ? "#16a34a" : "#f59e0b", display: "inline-block", animation: "pulse-dot 1.5s ease infinite" }} />
+                    <span style={{ fontSize: 11, color: "#64748b" }}>{heartbeatAge < 15 ? "Live" : `${heartbeatAge}s ago`}</span>
                   </div>
                   {urgent && (
                     <span style={{ fontSize: 10, fontWeight: 700, color: "#dc2626", background: "#fef2f2", borderRadius: 10, padding: "2px 8px" }}>⚠ LOW TIME</span>
@@ -2229,10 +2253,10 @@ function LiveMonitor({ students, exams }) {
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#64748b", marginBottom: 4 }}>
                   <span>Time used</span>
-                  <span>{100 - timePct}% elapsed</span>
+                  <span>{Math.max(0, 100 - timePct)}% elapsed</span>
                 </div>
                 <div style={{ height: 6, background: "#f1f5f9", borderRadius: 6, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${100 - timePct}%`, background: `linear-gradient(90deg,${timeColor},${urgent ? "#f87171" : warning ? "#fbbf24" : "#4ade80"})`, borderRadius: 6, transition: "width 0.5s" }} />
+                  <div style={{ height: "100%", width: `${Math.max(0, 100 - timePct)}%`, background: `linear-gradient(90deg,${timeColor},${urgent ? "#f87171" : warning ? "#fbbf24" : "#4ade80"})`, borderRadius: 6, transition: "width 0.5s" }} />
                 </div>
               </div>
  
@@ -2405,7 +2429,7 @@ function AdminPanel({ onLogout, data, setData, toast }) {
         {section==="questions" && <QuestionManagement questions={questions} setQuestions={setQuestions} toast={toast}/>}
         {section==="exams" && <ExamManagement exams={exams} setExams={setExams} questions={questions} results={results} toast={toast}/>}
         {section==="results" && <ResultsManagement results={results} students={students} exams={exams} questions={questions}/>}
-        {section==="monitor" && <Monitor students={students} exams={exams}/>}
+        {section==="monitor" && <LiveMonitor students={students} exams={exams}/>}
         {section==="users" && <UserManagement users={users} setUsers={setUsers} toast={toast}/>}
         {section==="system" && data.adminRole === "super_admin" && <SystemControl toast={toast}/>}
         {!["dashboard","students","questions","exams","results","monitor","users","system"].includes(section) && (
@@ -2422,107 +2446,6 @@ function AdminPanel({ onLogout, data, setData, toast }) {
         )}
         </div>
       </ErrorBoundary>
-    </div>
-  );
-}
-
-function Monitor({ students, exams }) {
-  const [sessions, setSessions] = useState({});
-  useEffect(() => {
-    const t = setInterval(() => {
-      try {
-        const all = JSON.parse(localStorage.getItem(LIVE_SESSIONS_KEY) || "{}");
-        const now = Date.now();
-        const active = {};
-        Object.entries(all).forEach(([sid, data]) => {
-          if (now - data.lastSeen < 30000) active[sid] = data;
-        });
-        setSessions(active);
-      } catch {}
-    }, 2000);
-    return () => clearInterval(t);
-  }, []);
-
-  const list = Object.values(sessions);
-  const activeStudents = (students || []).filter(s => s.isActive);
-  const allTakingExams = activeStudents.length > 0 && activeStudents.every(as => list.some(ls => String(ls.studentId) === String(as.id)));
-
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0 }}>Live Exam Monitor</h1>
-        <Badge color="green">{list.length} Active Sessions</Badge>
-      </div>
-
-      {list.length === 0 ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{ background: "#fff", borderRadius: 12, padding: 48, textAlign: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}
-        >
-          {allTakingExams ? (
-            <>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-              <h3 style={{ margin: 0, color: "#0f172a" }}>All active students are taking exams</h3>
-              <p style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>Excellent! Everyone who is currently active in the system is engaged in a session.</p>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📡</div>
-              <h3 style={{ margin: 0, color: "#0f172a" }}>No live sessions detected</h3>
-              <p style={{ color: "#64748b", fontSize: 14, marginTop: 8 }}>Students will appear here as soon as they start an exam.</p>
-            </>
-          )}
-        </div>
-      ) : (
-        <div>
-          {allTakingExams && (
-            <div
-              role="status"
-              aria-live="polite"
-              style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span style={{ fontSize: 18 }}>🎉</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#16a34a" }}>All active students are taking exams</span>
-            </div>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 20 }}>
-            {list.map(s => {
-              const urgent = s.timeLeft < 120;
-              const progress = Math.round(s.answered / s.total * 100);
-              return (
-                <div key={s.studentId} style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 4px 12px rgba(0,0,0,0.08)", borderLeft: `4px solid ${urgent ? "#dc2626" : "#3b82f6"}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{s.studentName}</div>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>{s.regNumber} · {s.className}</div>
-                    </div>
-                    <div style={{ padding: "4px 8px", borderRadius: 6, background: urgent ? "#fef2f2" : "#f1f5f9", color: urgent ? "#dc2626" : "#64748b", fontSize: 12, fontWeight: 700 }}>
-                      {fmt(s.timeLeft)}
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 4 }}>{s.examTitle}</div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
-                      <span>Progress: {s.answered}/{s.total}</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div style={{ height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
-                      <div style={{ height: "100%", background: urgent ? "#ef4444" : "#3b82f6", width: `${progress}%`, transition: "width 0.5s" }} />
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-                    Currently on Question {s.currentQuestion}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2742,6 +2665,7 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   const [current, setCurrent] = useState(exam.initialIndex || 0);
   const [timeLeft, setTimeLeft] = useState(exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60);
   const [confirmed, setConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const submitted = useRef(false);
   const [errorMsg, setErrorMsg] = useState("");
   const startedAt = useRef(Date.now()).current;
@@ -2804,6 +2728,7 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   const doSubmit = useCallback(async () => {
     if (submitted.current) return;
     submitted.current = true;
+    setIsSubmitting(true);
     
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
@@ -2825,8 +2750,18 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
       });
       await onSubmit({ score, total: qs.length, answers, questionIds: qs.map(q => q.id) });
     } catch (e) {
+      console.error("[Submission Error]", e);
       submitted.current = false;
-      // error is already alerted in handleSubmit in StudentPortal
+      setIsSubmitting(false);
+      
+      let msg = e.response?.data?.message || "Connection lost. Please try submitting again.";
+      // If validation error, extract the first error message
+      if (e.response?.status === 422 && e.response?.data?.errors) {
+        const errs = e.response.data.errors;
+        const first = Object.values(errs)[0];
+        if (Array.isArray(first)) msg = first[0];
+      }
+      setErrorMsg(msg);
     }
   }, [answers, qs, onSubmit, student.id]);
  
@@ -2869,8 +2804,14 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
         {errorMsg && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{errorMsg}</div>}
         <p style={{ color: "#64748b", fontSize: 14 }}>You've answered {answered} of {qs.length} questions. Submit now?</p>
         <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "center" }}>
-          <button style={btnGhost} onClick={() => setConfirmed(false)}>Go Back</button>
-          <button style={btnPrimary} onClick={doSubmit}>Submit Exam</button>
+          <button style={{...btnGhost, opacity: isSubmitting ? 0.5 : 1}} onClick={() => !isSubmitting && setConfirmed(false)} disabled={isSubmitting}>Go Back</button>
+          <button 
+            style={{...btnPrimary, opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "not-allowed" : "pointer"}} 
+            onClick={doSubmit} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : "Submit Exam"}
+          </button>
         </div>
       </div>
     </div>
@@ -3115,24 +3056,23 @@ function StudentPortal({ student, onLogout }) {
 
   const handleSubmit = async ({ answers }) => {
     const payload = {
-      answers: Object.entries(answers).map(([qid, sel]) => {
-        const q = examQuestions.find(x => x.id === qid);
-        let selected_option = sel;
-        
-        // If it's an MCQ (or no type specified), convert index to A/B/C/D
-        if (!q?.type || q.type === "mcq") {
-          selected_option = String.fromCharCode(65 + Number(sel));
-        } else if (q.type === "boolean") {
-          // Boolean: map 'true' -> 'A', 'false' -> 'B' (matching typical implementation)
-          selected_option = sel === "true" ? "A" : "B";
-        }
-        // For FIB, we send the string as is (backend handles it)
+      answers: Object.entries(answers)
+        .filter(([, sel]) => sel !== undefined && sel !== null && sel !== "")
+        .map(([qid, sel]) => {
+          const q = examQuestions.find(x => x.id === qid);
+          let selected_option = sel;
+          
+          if (!q?.type || q.type === "mcq") {
+            selected_option = String.fromCharCode(65 + Number(sel));
+          } else if (q.type === "boolean") {
+            selected_option = sel === "true" ? "A" : "B";
+          }
 
-        return {
-          question_id: Number(qid),
-          selected_option: String(selected_option)
-        };
-      })
+          return {
+            question_id: Number(qid),
+            selected_option: String(selected_option)
+          };
+        })
     };
     try {
       const res = await api.submitExam(Number(activeExam.id), payload);
@@ -3140,7 +3080,14 @@ function StudentPortal({ student, onLogout }) {
       setSubmitFeedback("Submission successful.");
       setExamState("result");
     } catch (e) {
-      alert(e.response?.data?.message || "Submission failed.");
+      let msg = e.response?.data?.message || "Submission failed.";
+      if (e.response?.status === 422 && e.response?.data?.errors) {
+        const errs = e.response.data.errors;
+        const first = Object.values(errs)[0];
+        if (Array.isArray(first)) msg = first[0];
+      }
+      alert(msg);
+      throw e;
     }
   };
 

@@ -36,6 +36,7 @@ Route::prefix('admin')->group(function (): void {
 
         Route::get('results', [AdminController::class, 'resultsIndex']);
         Route::delete('results/{result}', [AdminController::class, 'resultsDestroy']);
+        Route::get('active-sessions', [AdminController::class, 'activeSessions']);
 
         Route::middleware(['role:super_admin'])->group(function (): void {
             Route::get('system-settings', [AdminController::class, 'getSystemSettings']);

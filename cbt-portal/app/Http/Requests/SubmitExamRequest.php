@@ -19,7 +19,14 @@ class SubmitExamRequest extends FormRequest
         return [
             'answers' => ['required', 'array', 'min:1'],
             'answers.*.question_id' => ['required', 'integer', 'exists:questions,id'],
-            'answers.*.selected_option' => ['required', 'string', Rule::in(['A', 'B', 'C', 'D'])],
+            'answers.*.selected_option' => ['required', 'string', 'max:500'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'answers.*.selected_option' => 'answer',
         ];
     }
 }

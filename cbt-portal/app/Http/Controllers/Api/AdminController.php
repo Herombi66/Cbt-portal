@@ -226,6 +226,17 @@ class AdminController extends Controller
         return response()->json(['message' => 'Result deleted.']);
     }
 
+    public function activeSessions(): JsonResponse
+    {
+        $sessions = \App\Models\ExamSession::query()
+            ->with(['student', 'exam'])
+            ->where('status', 'in_progress')
+            ->where('last_synced_at', '>=', now()->subMinutes(10)) // Only recent activity
+            ->get();
+
+        return response()->json(['data' => $sessions]);
+    }
+
     public function getSystemSettings(): JsonResponse
     {
         $settings = \App\Models\SystemSetting::all()->pluck('value', 'key');
