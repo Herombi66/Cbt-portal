@@ -235,7 +235,7 @@ function StudentForm({ initial, onSave, onClose }) {
 }
 
 // ─── QUESTION FORM ────────────────────────────────────────────────────────────
-function QuestionForm({ initial, onSave, onClose }) {
+function QuestionForm({ initial, onSave, onClose, loading }) {
   const [form, setForm] = useState(initial || { subject: "", class_name: "SS3", question_text: "", type: "mcq", option_a: "", option_b: "", option_c: "", option_d: "", correct_option: "A", answer: "", answerBool: true });
   const set = k => e => {
     const v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
@@ -245,17 +245,17 @@ function QuestionForm({ initial, onSave, onClose }) {
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Subject *">
-          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" />
+          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" disabled={loading} />
         </Field>
         <Field label="Class *">
-          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")}>
+          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")} disabled={loading}>
             {CLASSES.map(c => <option key={c}>{c}</option>)}
           </select>
         </Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Question Type *">
-          <select style={inputStyle} value={form.type} onChange={set("type")}>
+          <select style={inputStyle} value={form.type} onChange={set("type")} disabled={loading}>
             <option value="mcq">Multiple Choice</option>
             <option value="fib">Fill in the Blanks</option>
             <option value="boolean">True / False</option>
@@ -263,7 +263,7 @@ function QuestionForm({ initial, onSave, onClose }) {
         </Field>
       </div>
       <Field label="Question Text *">
-        <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.question_text} onChange={set("question_text")} placeholder="Enter question..." />
+        <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.question_text} onChange={set("question_text")} placeholder="Enter question..." disabled={loading} />
       </Field>
 
       {form.type === "mcq" && (
@@ -271,9 +271,9 @@ function QuestionForm({ initial, onSave, onClose }) {
           <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Answer Options (select correct one)</p>
           {['A', 'B', 'C', 'D'].map((opt) => (
             <div key={opt} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <input type="radio" name="correct" checked={form.correct_option === opt} onChange={() => setForm(f => ({ ...f, correct_option: opt }))} style={{ accentColor: "#1d4ed8" }} />
+              <input type="radio" name="correct" checked={form.correct_option === opt} onChange={() => setForm(f => ({ ...f, correct_option: opt }))} style={{ accentColor: "#1d4ed8" }} disabled={loading} />
               <span style={{ fontSize: 13, color: "#64748b", minWidth: 20 }}>{opt}.</span>
-              <input style={{ ...inputStyle, flex: 1 }} value={form[`option_${opt.toLowerCase()}`]} onChange={set(`option_${opt.toLowerCase()}`)} placeholder={`Option ${opt}`} />
+              <input style={{ ...inputStyle, flex: 1 }} value={form[`option_${opt.toLowerCase()}`]} onChange={set(`option_${opt.toLowerCase()}`)} placeholder={`Option ${opt}`} disabled={loading} />
             </div>
           ))}
         </>
@@ -281,13 +281,13 @@ function QuestionForm({ initial, onSave, onClose }) {
 
       {form.type === "fib" && (
         <Field label="Correct Answer (Exact Match) *">
-          <input style={inputStyle} value={form.answer} onChange={set("answer")} placeholder="Enter the correct answer..." />
+          <input style={inputStyle} value={form.answer} onChange={set("answer")} placeholder="Enter the correct answer..." disabled={loading} />
         </Field>
       )}
 
       {form.type === "boolean" && (
         <Field label="Correct Answer *">
-          <select style={inputStyle} value={form.answerBool ? "true" : "false"} onChange={e => setForm(f => ({ ...f, answerBool: e.target.value === "true" }))}>
+          <select style={inputStyle} value={form.answerBool ? "true" : "false"} onChange={e => setForm(f => ({ ...f, answerBool: e.target.value === "true" }))} disabled={loading}>
             <option value="true">True</option>
             <option value="false">False</option>
           </select>
@@ -295,15 +295,17 @@ function QuestionForm({ initial, onSave, onClose }) {
       )}
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-        <button type="button" style={btnGhost} onClick={onClose}>Cancel</button>
-        <button type="button" style={btnPrimary} onClick={() => onSave(form)}>Save Question</button>
+        <button type="button" style={btnGhost} onClick={onClose} disabled={loading}>Cancel</button>
+        <button type="button" style={{...btnPrimary, opacity: loading ? 0.7 : 1}} onClick={() => onSave(form)} disabled={loading}>
+          {loading ? "Saving..." : "Save Question"}
+        </button>
       </div>
     </div>
   );
 }
 
 // ─── EXAM FORM ────────────────────────────────────────────────────────────────
-function ExamForm({ initial, questions, onSave, onClose }) {
+function ExamForm({ initial, questions, onSave, onClose, loading }) {
   const [form, setForm] = useState(initial || { title: "", subject: "", class_name: "SS3", description: "", duration_minutes: 30, starts_at: "", ends_at: "", is_active: true, question_ids: [] });
   const set = k => e => { const v = e.target.type === "checkbox" ? e.target.checked : e.target.value; setForm(f => ({ ...f, [k]: v })); };
   const toggleQ = id => setForm(f => {
@@ -324,30 +326,30 @@ function ExamForm({ initial, questions, onSave, onClose }) {
 
   return (
     <div>
-      <Field label="Exam Title *"><input style={inputStyle} value={form.title} onChange={set("title")} placeholder="e.g. Mathematics Mid-Term" /></Field>
+      <Field label="Exam Title *"><input style={inputStyle} value={form.title} onChange={set("title")} placeholder="e.g. Mathematics Mid-Term" disabled={loading} /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label="Subject *">
-          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" />
+          <input style={inputStyle} value={form.subject || ""} onChange={set("subject")} placeholder="e.g. Mathematics" disabled={loading} />
         </Field>
         <Field label="Class *">
-          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")}>
+          <select style={inputStyle} value={form.class_name || "SS3"} onChange={set("class_name")} disabled={loading}>
             {CLASSES.map(c => <option key={c}>{c}</option>)}
           </select>
         </Field>
       </div>
-      <Field label="Description"><textarea style={{ ...inputStyle, minHeight: 60 }} value={form.description} onChange={set("description")} placeholder="Exam description..." /></Field>
+      <Field label="Description"><textarea style={{ ...inputStyle, minHeight: 60 }} value={form.description} onChange={set("description")} placeholder="Exam description..." disabled={loading} /></Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Duration (mins)"><input style={inputStyle} type="number" value={form.duration_minutes} onChange={set("duration_minutes")} min={5} /></Field>
+        <Field label="Duration (mins)"><input style={inputStyle} type="number" value={form.duration_minutes} onChange={set("duration_minutes")} min={5} disabled={loading} /></Field>
         <Field label="Active">
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: "pointer", marginTop: 8 }}>
-            <input type="checkbox" checked={form.is_active} onChange={set("is_active")} style={{ accentColor: "#1d4ed8" }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, cursor: loading ? "default" : "pointer", marginTop: 8 }}>
+            <input type="checkbox" checked={form.is_active} onChange={set("is_active")} style={{ accentColor: "#1d4ed8" }} disabled={loading} />
             Active
           </label>
         </Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label="Start Time (optional)"><input style={inputStyle} type="datetime-local" value={form.starts_at} onChange={set("starts_at")} /></Field>
-        <Field label="End Time (optional)"><input style={inputStyle} type="datetime-local" value={form.ends_at} onChange={set("ends_at")} /></Field>
+        <Field label="Start Time (optional)"><input style={inputStyle} type="datetime-local" value={form.starts_at} onChange={set("starts_at")} disabled={loading} /></Field>
+        <Field label="End Time (optional)"><input style={inputStyle} type="datetime-local" value={form.ends_at} onChange={set("ends_at")} disabled={loading} /></Field>
       </div>
       <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
         Select Questions ({form.question_ids.length} selected)
@@ -360,15 +362,17 @@ function ExamForm({ initial, questions, onSave, onClose }) {
           </div>
         )}
         {filteredQs.map(q => (
-          <label key={q.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
-            <input type="checkbox" checked={form.question_ids.includes(q.id)} onChange={() => toggleQ(q.id)} style={{ marginTop: 2, accentColor: "#1d4ed8" }} />
+          <label key={q.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: loading ? "default" : "pointer", padding: "6px 0", borderBottom: "1px solid #f1f5f9", opacity: loading ? 0.7 : 1 }}>
+            <input type="checkbox" checked={form.question_ids.includes(q.id)} onChange={() => toggleQ(q.id)} style={{ marginTop: 2, accentColor: "#1d4ed8" }} disabled={loading} />
             <span style={{ fontSize: 13, color: "#374151" }}>{q.question_text}</span>
           </label>
         ))}
       </div>
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-        <button type="button" style={btnGhost} onClick={onClose}>Cancel</button>
-        <button type="button" style={btnPrimary} onClick={() => onSave(form)}>Save Exam</button>
+        <button type="button" style={btnGhost} onClick={onClose} disabled={loading}>Cancel</button>
+        <button type="button" style={{...btnPrimary, opacity: loading ? 0.7 : 1}} onClick={() => onSave(form)} disabled={loading}>
+          {loading ? "Saving Exam..." : "Save Exam"}
+        </button>
       </div>
     </div>
   );
@@ -1192,7 +1196,7 @@ function StudentManagement({ students, setStudents, toast }) {
 }
 
 // ── BULK UPLOAD MODAL ─────────────────────────────────────────────────────────
-function BulkUploadModal({ onClose, onImport, toast }) {
+function BulkUploadModal({ onClose, onImport, toast, importing, importProgress }) {
   const [step, setStep] = useState("upload"); // "upload" | "preview" | "report"
   const [parsed, setParsed] = useState([]);
   const [errors, setErrors] = useState([]);
@@ -1353,119 +1357,137 @@ function BulkUploadModal({ onClose, onImport, toast }) {
       return;
     }
     onImport(parsed);
-    onClose();
   };
 
   return (
     <Modal title="Bulk Upload Questions" onClose={onClose} wide>
-      {step === "upload" && (
-        <div>
-          <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:16,marginBottom:20}}>
-            <p style={{margin:"0 0 8px",fontSize:13,fontWeight:700,color:"#1d4ed8"}}>📋 Supported Formats</p>
-            <p style={{margin:"0 0 6px",fontSize:13,color:"#1e40af"}}>.csv and .json (Excel will be supported when the Excel parser is available)</p>
-            <p style={{margin:"0 0 6px",fontSize:13,color:"#1e40af"}}>Columns: type, subject, class, question, option_a..d, correct_option, expected_answer, answer_bool, score, difficulty, tags</p>
-            <div style={{display:"flex",gap:10,alignItems:"center"}}>
-              <label style={{fontSize:12,color:"#64748b"}}>Rollback threshold (%)</label>
-              <input type="range" min={0} max={50} value={threshold} onChange={e=>setThreshold(Number(e.target.value))}/>
-              <span style={{fontSize:12,color:"#334155"}}>{threshold}%</span>
+      {importing ? (
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <div style={{ fontSize: 40, marginBottom: 20 }}>⏳</div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Importing Questions...</h3>
+          <p style={{ fontSize: 14, color: "#64748b", marginBottom: 24 }}>Please wait while we process your data. This may take a moment for large files.</p>
+          <div style={{ maxWidth: 400, margin: "0 auto" }}>
+            <div style={{ height: 10, background: "#e2e8f0", borderRadius: 10, overflow: "hidden", marginBottom: 12 }}>
+              <div style={{ height: "100%", width: `${importProgress}%`, background: "#3b82f6", transition: "width 0.3s ease-out" }} />
             </div>
-          </div>
-          <button onClick={downloadTemplate} style={{...btnGhost,marginBottom:20,width:"100%",padding:"11px",border:"1.5px dashed #cbd5e1",background:"#f8fafc"}}>
-            ⬇ Download Template
-          </button>
-          <div
-            onDragOver={e=>{e.preventDefault();setDragging(true)}}
-            onDragLeave={()=>setDragging(false)}
-            onDrop={handleDrop}
-            onClick={()=>fileRef.current.click()}
-            style={{
-              border:`2px dashed ${dragging?"#3b82f6":"#cbd5e1"}`,
-              borderRadius:12, padding:"40px 20px", textAlign:"center", cursor:"pointer",
-              background:dragging?"#eff6ff":"#fafafa", transition:"all 0.2s"
-            }}
-          >
-            <div style={{fontSize:40,marginBottom:10}}>📂</div>
-            <p style={{margin:"0 0 6px",fontSize:15,fontWeight:600,color:"#334155"}}>Drop your file here</p>
-            <p style={{margin:0,fontSize:13,color:"#94a3b8"}}>or click to browse (.csv, .json)</p>
-            <input ref={fileRef} type="file" accept=".csv,.json" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600 }}>
+              <span style={{ color: "#3b82f6" }}>{importProgress}% Complete</span>
+              <span style={{ color: "#64748b" }}>{parsed.length} Questions</span>
+            </div>
           </div>
         </div>
-      )}
-      {step === "preview" && (
-        <div>
-          <div style={{display:"flex",gap:12,marginBottom:12,alignItems:"center"}}>
-            <div style={{flex:1,height:6,background:"#e2e8f0",borderRadius:6,overflow:"hidden"}}>
-              <div style={{height:"100%",width:`${progress}%`,background:"#3b82f6",transition:"width 0.2s"}}/>
-            </div>
-            <span style={{fontSize:12,color:"#64748b"}}>{progress}%</span>
-          </div>
-          <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
-            {parsed.length > 0 && <div style={{background:"#dcfce7",color:"#16a34a",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>✓ {parsed.length} ready</div>}
-            {skipped.length > 0 && <div style={{background:"#fef9c3",color:"#ca8a04",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>⟳ {skipped.length} skipped</div>}
-            {errors.length > 0 && <div style={{background:"#fee2e2",color:"#dc2626",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>⚠ {errors.length} errors</div>}
-          </div>
-          {errors.length > 0 && (
-            <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:14,marginBottom:16,maxHeight:160,overflowY:"auto"}}>
-              {errors.map((e,i)=> <p key={i} style={{margin:"3px 0",fontSize:12,color:"#dc2626"}}>• {e}</p>)}
-            </div>
-          )}
-          {parsed.length > 0 && (
-            <div style={{maxHeight:300,overflowY:"auto",border:"1.5px solid #e2e8f0",borderRadius:10,marginBottom:16}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead>
-                  <tr style={{background:"#f8fafc",position:"sticky",top:0}}>
-                    {["#","Type","Subject","Class","Question","Meta"].map(h=>(
-                      <th key={h} style={{padding:"9px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsed.map((q,i)=>(
-                    <tr key={i} style={{borderTop:"1px solid #f1f5f9"}}>
-                      <td style={{padding:"8px 12px",fontSize:12,color:"#94a3b8"}}>{i+1}</td>
-                      <td style={{padding:"8px 12px",fontSize:12}}>{q.type}</td>
-                      <td style={{padding:"8px 12px",fontSize:12,fontWeight:600,color:"#1d4ed8"}}>{q.subject}</td>
-                      <td style={{padding:"8px 12px",fontSize:12}}>{q.className}</td>
-                      <td style={{padding:"8px 12px",fontSize:12,maxWidth:260}}>{q.text.length>80?q.text.slice(0,80)+"…":q.text}</td>
-                      <td style={{padding:"8px 12px",fontSize:12,color:"#64748b"}}>
-                        {q.type==="mcq" ? `A-D; correct=${String.fromCharCode(65+(q.correct??0))}` :
-                         q.type==="fib" ? `Answer=${q.answer}` :
-                         q.type==="boolean" ? `Answer=${q.answerBool?"True":"False"}` : ""}
-                        {q.tags?.length ? ` · tags=${q.tags.join(",")}` : ""}
-                        {q.difficulty ? ` · diff=${q.difficulty}` : ""}
-                        {q.score ? ` · score=${q.score}` : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <div style={{display:"flex",gap:10,justifyContent:"space-between"}}>
-            <button style={btnGhost} onClick={()=>{setStep("upload");setParsed([]);setErrors([]);setSkipped([]);setProgress(0);}}>← Upload Different File</button>
-            <div style={{display:"flex",gap:10}}>
-              <button style={btnGhost} onClick={onClose}>Cancel</button>
-              <button style={{...btnPrimary,opacity:parsed.length===0?0.5:1}} disabled={parsed.length===0} onClick={confirmImport}>
-                Import {parsed.length} Question{parsed.length!==1?"s":""}
+      ) : (
+        <>
+          {step === "upload" && (
+            <div>
+              <div style={{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:10,padding:16,marginBottom:20}}>
+                <p style={{margin:"0 0 8px",fontSize:13,fontWeight:700,color:"#1d4ed8"}}>📋 Supported Formats</p>
+                <p style={{margin:"0 0 6px",fontSize:13,color:"#1e40af"}}>.csv and .json (Excel will be supported when the Excel parser is available)</p>
+                <p style={{margin:"0 0 6px",fontSize:13,color:"#1e40af"}}>Columns: type, subject, class, question, option_a..d, correct_option, expected_answer, answer_bool, score, difficulty, tags</p>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                  <label style={{fontSize:12,color:"#64748b"}}>Rollback threshold (%)</label>
+                  <input type="range" min={0} max={50} value={threshold} onChange={e=>setThreshold(Number(e.target.value))}/>
+                  <span style={{fontSize:12,color:"#334155"}}>{threshold}%</span>
+                </div>
+              </div>
+              <button onClick={downloadTemplate} style={{...btnGhost,marginBottom:20,width:"100%",padding:"11px",border:"1.5px dashed #cbd5e1",background:"#f8fafc"}}>
+                ⬇ Download Template
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {step === "report" && (
-        <div>
-          <h3 style={{fontSize:16,fontWeight:700,color:"#0f172a",marginBottom:12}}>Upload Report</h3>
-          <p style={{fontSize:13,color:"#64748b"}}>Import aborted due to high error rate. Review issues and re-upload.</p>
-          {errors.length > 0 && (
-            <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:14,marginBottom:16,maxHeight:200,overflowY:"auto"}}>
-              {errors.map((e,i)=> <p key={i} style={{margin:"3px 0",fontSize:12,color:"#dc2626"}}>• {e}</p>)}
+              <div
+                onDragOver={e=>{e.preventDefault();setDragging(true)}}
+                onDragLeave={()=>setDragging(false)}
+                onDrop={handleDrop}
+                onClick={()=>fileRef.current.click()}
+                style={{
+                  border:`2px dashed ${dragging?"#3b82f6":"#cbd5e1"}`,
+                  borderRadius:12, padding:"40px 20px", textAlign:"center", cursor:"pointer",
+                  background:dragging?"#eff6ff":"#fafafa", transition:"all 0.2s"
+                }}
+              >
+                <div style={{fontSize:40,marginBottom:10}}>📂</div>
+                <p style={{margin:"0 0 6px",fontSize:15,fontWeight:600,color:"#334155"}}>Drop your file here</p>
+                <p style={{margin:0,fontSize:13,color:"#94a3b8"}}>or click to browse (.csv, .json)</p>
+                <input ref={fileRef} type="file" accept=".csv,.json" style={{display:"none"}} onChange={e=>handleFile(e.target.files[0])}/>
+              </div>
             </div>
           )}
-          <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-            <button style={btnGhost} onClick={()=>{setStep("upload");setParsed([]);setErrors([]);setSkipped([]);setProgress(0);}}>Try Again</button>
-            <button style={btnPrimary} onClick={onClose}>Close</button>
-          </div>
-        </div>
+          {step === "preview" && (
+            <div>
+              <div style={{display:"flex",gap:12,marginBottom:12,alignItems:"center"}}>
+                <div style={{flex:1,height:6,background:"#e2e8f0",borderRadius:6,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${progress}%`,background:"#3b82f6",transition:"width 0.2s"}}/>
+                </div>
+                <span style={{fontSize:12,color:"#64748b"}}>{progress}%</span>
+              </div>
+              <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+                {parsed.length > 0 && <div style={{background:"#dcfce7",color:"#16a34a",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>✓ {parsed.length} ready</div>}
+                {skipped.length > 0 && <div style={{background:"#fef9c3",color:"#ca8a04",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>⟳ {skipped.length} skipped</div>}
+                {errors.length > 0 && <div style={{background:"#fee2e2",color:"#dc2626",padding:"8px 16px",borderRadius:8,fontSize:13,fontWeight:600}}>⚠ {errors.length} errors</div>}
+              </div>
+              {errors.length > 0 && (
+                <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:14,marginBottom:16,maxHeight:160,overflowY:"auto"}}>
+                  {errors.map((e,i)=> <p key={i} style={{margin:"3px 0",fontSize:12,color:"#dc2626"}}>• {e}</p>)}
+                </div>
+              )}
+              {parsed.length > 0 && (
+                <div style={{maxHeight:300,overflowY:"auto",border:"1.5px solid #e2e8f0",borderRadius:10,marginBottom:16}}>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead>
+                      <tr style={{background:"#f8fafc",position:"sticky",top:0}}>
+                        {["#","Type","Subject","Class","Question","Meta"].map(h=>(
+                          <th key={h} style={{padding:"9px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"#64748b",textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsed.map((q,i)=>(
+                        <tr key={i} style={{borderTop:"1px solid #f1f5f9"}}>
+                          <td style={{padding:"8px 12px",fontSize:12,color:"#94a3b8"}}>{i+1}</td>
+                          <td style={{padding:"8px 12px",fontSize:12}}>{q.type}</td>
+                          <td style={{padding:"8px 12px",fontSize:12,fontWeight:600,color:"#1d4ed8"}}>{q.subject}</td>
+                          <td style={{padding:"8px 12px",fontSize:12}}>{q.className}</td>
+                          <td style={{padding:"8px 12px",fontSize:12,maxWidth:260}}>{q.text.length>80?q.text.slice(0,80)+"…":q.text}</td>
+                          <td style={{padding:"8px 12px",fontSize:12,color:"#64748b"}}>
+                            {q.type==="mcq" ? `A-D; correct=${String.fromCharCode(65+(q.correct??0))}` :
+                             q.type==="fib" ? `Answer=${q.answer}` :
+                             q.type==="boolean" ? `Answer=${q.answerBool?"True":"False"}` : ""}
+                            {q.tags?.length ? ` · tags=${q.tags.join(",")}` : ""}
+                            {q.difficulty ? ` · diff=${q.difficulty}` : ""}
+                            {q.score ? ` · score=${q.score}` : ""}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{display:"flex",gap:10,justifyContent:"space-between"}}>
+                <button style={btnGhost} onClick={()=>{setStep("upload");setParsed([]);setErrors([]);setSkipped([]);setProgress(0);}}>← Upload Different File</button>
+                <div style={{display:"flex",gap:10}}>
+                  <button style={btnGhost} onClick={onClose}>Cancel</button>
+                  <button style={{...btnPrimary,opacity:parsed.length===0?0.5:1}} disabled={parsed.length===0} onClick={confirmImport}>
+                    Import {parsed.length} Question{parsed.length!==1?"s":""}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {step === "report" && (
+            <div>
+              <h3 style={{fontSize:16,fontWeight:700,color:"#0f172a",marginBottom:12}}>Upload Report</h3>
+              <p style={{fontSize:13,color:"#64748b"}}>Import aborted due to high error rate. Review issues and re-upload.</p>
+              {errors.length > 0 && (
+                <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:10,padding:14,marginBottom:16,maxHeight:200,overflowY:"auto"}}>
+                  {errors.map((e,i)=> <p key={i} style={{margin:"3px 0",fontSize:12,color:"#dc2626"}}>• {e}</p>)}
+                </div>
+              )}
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+                <button style={btnGhost} onClick={()=>{setStep("upload");setParsed([]);setErrors([]);setSkipped([]);setProgress(0);}}>Try Again</button>
+                <button style={btnPrimary} onClick={onClose}>Close</button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </Modal>
   );
@@ -1477,6 +1499,9 @@ function QuestionManagement({ questions, setQuestions, toast }) {
   const [showBulk, setShowBulk] = useState(false);
   const [filters, setFilters] = useState({ subject: "all", class: "all" });
   const [selected, setSelected] = useState([]);
+  const [deletingIds, setDeletingIds] = useState(new Set());
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
 
   const filteredQuestions = useMemo(() => {
     return (questions || []).filter(q => {
@@ -1506,14 +1531,33 @@ function QuestionManagement({ questions, setQuestions, toast }) {
 
   const deleteSelected = async () => {
     if (!confirm(`Delete ${selected.length} selected questions?`)) return;
+    const idsToDelete = [...selected];
+    const numericIds = idsToDelete.map(Number);
+    
+    // UI Feedback: Mark as deleting
+    setDeletingIds(prev => {
+      const next = new Set(prev);
+      idsToDelete.forEach(id => next.add(id));
+      return next;
+    });
+
     try {
-      await Promise.all(selected.map(id => api.deleteQuestion(Number(id))));
-      setQuestions(qs => qs.filter(q => !selected.includes(q.id)));
+      await api.bulkDeleteQuestions(numericIds);
+      
+      // Success: Remove from state
+      setQuestions(qs => qs.filter(q => !idsToDelete.includes(q.id)));
       setSelected([]);
-      toast.success("Selected questions deleted.");
+      toast.success(`${idsToDelete.length} questions deleted.`);
     } catch (e) {
-      console.error("[Delete Selected Error]", e);
-      toast.error("Failed to delete some questions.");
+      console.error("[Bulk Delete Error]", e);
+      toast.error(e.response?.data?.message || "Failed to delete selected questions.");
+    } finally {
+      // Clear deleting status
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        idsToDelete.forEach(id => next.delete(id));
+        return next;
+      });
     }
   };
 
@@ -1531,10 +1575,11 @@ function QuestionManagement({ questions, setQuestions, toast }) {
       return;
     }
 
+    setImporting(true); // Reuse importing state for single save feedback
     try {
       if (modal === "add") {
         const res = await api.createQuestion(form);
-        setQuestions(qs => [...qs, res.data]);
+        setQuestions(qs => [res.data, ...qs]);
         toast.success("Question added.");
       } else {
         const res = await api.updateQuestion(modal.id, form);
@@ -1544,11 +1589,15 @@ function QuestionManagement({ questions, setQuestions, toast }) {
       setModal(null);
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to save question.");
+    } finally {
+      setImporting(false);
     }
   };
 
   const del = async id => {
     if (!confirm("Delete this question?")) return;
+    
+    setDeletingIds(prev => new Set(prev).add(id));
     try {
       await api.deleteQuestion(Number(id));
       setQuestions(qs => qs.filter(q => q.id !== id));
@@ -1556,14 +1605,22 @@ function QuestionManagement({ questions, setQuestions, toast }) {
     } catch (e) {
       console.error("[Delete Question Error]", e);
       toast.error(e.response?.data?.message || "Failed to delete question.");
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
   const handleBulkImport = async newQs => {
+    setImporting(true);
+    setImportProgress(0);
     try {
-      const results = await Promise.all(newQs.map(q => {
+      const payloads = newQs.map(q => {
         const type = (q.type || 'mcq').toLowerCase();
-        const payload = {
+        return {
           subject: q.subject,
           class_name: q.className,
           type: type,
@@ -1576,14 +1633,31 @@ function QuestionManagement({ questions, setQuestions, toast }) {
           answer: type === 'fib' ? (q.answer || q.correct_answer) : null,
           answerBool: type === 'boolean' ? (q.answerBool ?? (q.answer === 'true' || q.correct_answer === 'true')) : null,
         };
-        return api.createQuestion(payload);
-      }));
-      const mapped = results.map(res => res.data);
-      setQuestions(qs => [...qs, ...mapped]);
-      toast.success(`${mapped.length} questions imported successfully!`);
+      });
+
+      const chunkSize = 100;
+      const chunks = [];
+      for (let i = 0; i < payloads.length; i += chunkSize) {
+        chunks.push(payloads.slice(i, i + chunkSize));
+      }
+
+      const allCreated = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const res = await api.bulkCreateQuestions(chunks[i]);
+        allCreated.push(...res.data);
+        setImportProgress(Math.round(((i + 1) / chunks.length) * 100));
+      }
+
+      setQuestions(qs => [...allCreated, ...qs]);
+      toast.success(`${allCreated.length} questions imported successfully!`);
+      setShowBulk(false);
     } catch (e) {
       console.error("[Bulk Import Error]", e);
-      toast.error("Failed to bulk import some questions. Ensure all required fields are present.");
+      const msg = e.response?.data?.message || "Failed to bulk import some questions. Ensure all required fields are present.";
+      toast.error(msg);
+    } finally {
+      setImporting(false);
+      setImportProgress(0);
     }
   };
 
@@ -1598,57 +1672,92 @@ function QuestionManagement({ questions, setQuestions, toast }) {
       </div>
 
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-        <select style={inputStyle} value={filters.subject} onChange={e => handleFilterChange("subject", e.target.value)}>
+        <select style={inputStyle} value={filters.subject} onChange={e => handleFilterChange("subject", e.target.value)} disabled={deletingIds.size > 0 || importing}>
           <option value="all">All Subjects</option>
           {[...new Set(questions.map(q => q.subject).filter(Boolean))].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select style={inputStyle} value={filters.class} onChange={e => handleFilterChange("class", e.target.value)}>
+        <select style={inputStyle} value={filters.class} onChange={e => handleFilterChange("class", e.target.value)} disabled={deletingIds.size > 0 || importing}>
           <option value="all">All Classes</option>
           {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {selected.length > 0 && <button style={btnDanger} onClick={deleteSelected}>Delete Selected ({selected.length})</button>}
+        {selected.length > 0 && (
+          <button 
+            style={{...btnDanger, opacity: (deletingIds.size > 0 || importing) ? 0.6 : 1}} 
+            onClick={deleteSelected} 
+            disabled={deletingIds.size > 0 || importing}
+          >
+            {deletingIds.size > 0 ? "Deleting..." : `Delete Selected (${selected.length})`}
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: 16, background: "#f1f5f9", borderRadius: 6 }}>
-          <input type="checkbox" checked={selected.length === filteredQuestions.length && filteredQuestions.length > 0} onChange={toggleSelectAll} />
+          <input type="checkbox" checked={selected.length === filteredQuestions.length && filteredQuestions.length > 0} onChange={toggleSelectAll} disabled={deletingIds.size > 0 || importing} />
           <span>{selected.length} selected</span>
         </div>
-        {filteredQuestions.map((q, i) => (
-          <div key={q.id} style={{ background: "#fff", borderRadius: 10, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: 16 }}>
-            <input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggleSelect(q.id)} />
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{i + 1}. {q.question_text}</p>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, background: "#e0f2fe", color: "#0ea5e9", padding: "2px 8px", borderRadius: 12 }}>{q.subject}</span>
-                    <span style={{ fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#22c55e", padding: "2px 8px", borderRadius: 12 }}>{q.class_name}</span>
+        {filteredQuestions.map((q, i) => {
+          const isDeleting = deletingIds.has(q.id);
+          return (
+            <div key={q.id} style={{ 
+              background: "#fff", 
+              borderRadius: 10, 
+              padding: "16px 20px", 
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)", 
+              display: "flex", 
+              alignItems: "center", 
+              gap: 16,
+              opacity: isDeleting ? 0.5 : 1,
+              transition: "opacity 0.2s"
+            }}>
+              <input type="checkbox" checked={selected.includes(q.id)} onChange={() => toggleSelect(q.id)} disabled={isDeleting || importing} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{i + 1}. {q.question_text}</p>
+                    <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, background: "#e0f2fe", color: "#0ea5e9", padding: "2px 8px", borderRadius: 12 }}>{q.subject}</span>
+                      <span style={{ fontSize: 12, fontWeight: 500, background: "#f0fdf4", color: "#22c55e", padding: "2px 8px", borderRadius: 12 }}>{q.class_name}</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                      {['a', 'b', 'c', 'd'].map((opt) => (
+                        <span key={opt} style={{ fontSize: 13, color: q.correct_option === opt.toUpperCase() ? "#16a34a" : "#64748b", background: q.correct_option === opt.toUpperCase() ? "#dcfce7" : "#f8fafc", padding: "4px 10px", borderRadius: 6 }}>
+                          {q.correct_option === opt.toUpperCase() ? "✓ " : ""}{opt.toUpperCase()}. {q[`option_${opt}`]}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                    {['a', 'b', 'c', 'd'].map((opt) => (
-                      <span key={opt} style={{ fontSize: 13, color: q.correct_option === opt.toUpperCase() ? "#16a34a" : "#64748b", background: q.correct_option === opt.toUpperCase() ? "#dcfce7" : "#f8fafc", padding: "4px 10px", borderRadius: 6 }}>
-                        {q.correct_option === opt.toUpperCase() ? "✓ " : ""}{opt.toUpperCase()}. {q[`option_${opt}`]}
-                      </span>
-                    ))}
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button style={btnGhost} onClick={() => setModal(q)} disabled={isDeleting || importing}>Edit</button>
+                    <button 
+                      style={{...btnDanger, padding: "6px 12px", fontSize: 13}} 
+                      onClick={() => del(q.id)} 
+                      disabled={isDeleting || importing}
+                    >
+                      {isDeleting ? "..." : "Del"}
+                    </button>
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                  <button style={btnGhost} onClick={() => setModal(q)}>Edit</button>
-                  <button style={btnDanger} onClick={() => del(q.id)}>Del</button>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {filteredQuestions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No questions found.</div>}
       </div>
       {modal && (
         <Modal title={modal === "add" ? "Add Question" : "Edit Question"} onClose={() => setModal(null)}>
-          <QuestionForm initial={modal === "add" ? null : modal} onSave={save} onClose={() => setModal(null)} />
+          <QuestionForm initial={modal === "add" ? null : modal} onSave={save} onClose={() => setModal(null)} loading={importing} />
         </Modal>
       )}
-      {showBulk && <BulkUploadModal onClose={() => setShowBulk(false)} onImport={handleBulkImport} toast={toast} />}
+      {showBulk && (
+        <BulkUploadModal 
+          onClose={() => setShowBulk(false)} 
+          onImport={handleBulkImport} 
+          toast={toast} 
+          importing={importing} 
+          importProgress={importProgress}
+        />
+      )}
     </div>
   );
 }
@@ -1656,6 +1765,8 @@ function QuestionManagement({ questions, setQuestions, toast }) {
 // ── EXAM MANAGEMENT ────────────────────────────────────────────────────────────
 function ExamManagement({ exams, setExams, questions, results, toast }) {
   const [modal, setModal] = useState(null);
+  const [deletingIds, setDeletingIds] = useState(new Set());
+  const [saving, setSaving] = useState(false);
 
   const save = async form => {
     if (!form.title?.trim() || !form.subject?.trim() || !form.class_name?.trim()) { 
@@ -1673,6 +1784,7 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
       ends_at: form.ends_at || null,
     };
     
+    setSaving(true);
     try {
       let savedExam;
       if (modal === "add") {
@@ -1695,17 +1807,26 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
       setModal(null);
     } catch (e) {
       toast.error(e.response?.data?.message || "Failed to save exam.");
+    } finally {
+      setSaving(false);
     }
   };
 
   const del = async id => {
     if (!confirm("Delete this exam?")) return;
+    setDeletingIds(prev => new Set(prev).add(id));
     try {
       await api.deleteExam(id);
       setExams(es => es.filter(e => e.id !== id));
       toast.success("Deleted.");
     } catch {
       toast.error("Failed to delete exam.");
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -1724,13 +1845,21 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
         <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#0f172a"}}>Exam Management</h1>
-        <button style={btnPrimary} onClick={()=>setModal("add")}>+ Create Exam</button>
+        <button style={btnPrimary} onClick={()=>setModal("add")} disabled={saving}>+ Create Exam</button>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         {exams.map(e => {
           const subResults = results.filter(r=>r.examId===e.id);
+          const isDeleting = deletingIds.has(e.id);
           return (
-            <div key={e.id} style={{ background: "#fff", borderRadius: 10, padding: "18px 22px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div key={e.id} style={{ 
+              background: "#fff", 
+              borderRadius: 10, 
+              padding: "18px 22px", 
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              opacity: isDeleting ? 0.5 : 1,
+              transition: "opacity 0.2s"
+            }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -1744,9 +1873,9 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-                  <button style={btnGhost} onClick={() => toggle(e.id)}>{e.is_active ? "Deactivate" : "Activate"}</button>
-                  <button style={btnGhost} onClick={() => setModal(e)}>Edit</button>
-                  <button style={btnDanger} onClick={() => del(e.id)}>Delete</button>
+                  <button style={btnGhost} onClick={() => toggle(e.id)} disabled={isDeleting || saving}>{e.is_active ? "Deactivate" : "Activate"}</button>
+                  <button style={btnGhost} onClick={() => setModal(e)} disabled={isDeleting || saving}>Edit</button>
+                  <button style={btnDanger} onClick={() => del(e.id)} disabled={isDeleting || saving}>{isDeleting ? "..." : "Delete"}</button>
                 </div>
               </div>
             </div>
@@ -1756,7 +1885,7 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
       </div>
       {modal && (
         <Modal title={modal==="add"?"Create Exam":"Edit Exam"} onClose={()=>setModal(null)} wide>
-          <ExamForm initial={modal==="add"?null:modal} questions={questions} onSave={save} onClose={()=>setModal(null)}/>
+          <ExamForm initial={modal==="add"?null:modal} questions={questions} onSave={save} onClose={()=>setModal(null)} loading={saving} />
         </Modal>
       )}
     </div>
@@ -3364,9 +3493,9 @@ function AppContent() {
     setLoading(true);
     try {
       const promises = [
-        api.listQuestions(),
-        api.listAdminExams(),
-        api.listStudents()
+        api.listQuestions({ per_page: 1000 }),
+        api.listAdminExams({ per_page: 1000 }),
+        api.listStudents({ per_page: 1000 })
       ];
       if (session.role === "super_admin") {
         promises.push(api.listUsers());

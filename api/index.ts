@@ -29,7 +29,7 @@ export async function studentLogout(): Promise<void> {
 
 // --- Admin: Questions ---
 
-export async function listQuestions(params: { page?: number } = {}): Promise<Paginated<Question>> {
+export async function listQuestions(params: { page?: number; per_page?: number } = {}): Promise<Paginated<Question>> {
   const { data } = await api.get<Paginated<Question>>('/admin/questions', { params })
   return data
 }
@@ -44,6 +44,11 @@ export async function createQuestion(payload: Partial<Question>): Promise<{ data
   return data
 }
 
+export async function bulkCreateQuestions(questions: Partial<Question>[]): Promise<{ data: Question[]; message: string }> {
+  const { data } = await api.post<{ data: Question[]; message: string }>('/admin/questions/bulk', { questions })
+  return data
+}
+
 export async function updateQuestion(id: number, payload: Partial<Question>): Promise<{ data: Question }> {
   const { data } = await api.put<{ data: Question }>(`/admin/questions/${id}`, payload)
   return data
@@ -53,9 +58,14 @@ export async function deleteQuestion(id: number): Promise<void> {
   await api.delete(`/admin/questions/${id}`)
 }
 
+export async function bulkDeleteQuestions(ids: number[]): Promise<{ message: string }> {
+  const { data } = await api.delete<{ message: string }>('/admin/questions/bulk', { data: { ids } })
+  return data
+}
+
 // --- Admin: Exams ---
 
-export async function listAdminExams(params: { page?: number } = {}): Promise<Paginated<Exam>> {
+export async function listAdminExams(params: { page?: number; per_page?: number } = {}): Promise<Paginated<Exam>> {
   const { data } = await api.get<Paginated<Exam>>('/admin/exams', { params })
   return data
 }
@@ -86,7 +96,7 @@ export async function assignExamQuestions(examId: number, questions: Array<{ que
 
 // --- Admin: Students ---
 
-export async function listStudents(params: { page?: number } = {}): Promise<Paginated<Student>> {
+export async function listStudents(params: { page?: number; per_page?: number } = {}): Promise<Paginated<Student>> {
   const { data } = await api.get<Paginated<Student>>('/admin/students', { params })
   return data
 }

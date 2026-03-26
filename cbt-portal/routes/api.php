@@ -15,6 +15,8 @@ Route::prefix('admin')->group(function (): void {
 
         Route::get('questions', [AdminController::class, 'questionsIndex']);
         Route::post('questions', [AdminController::class, 'questionsStore']);
+        Route::post('questions/bulk', [AdminController::class, 'questionsBulkStore']);
+        Route::delete('questions/bulk', [AdminController::class, 'questionsBulkDestroy']);
         Route::get('questions/{question}', [AdminController::class, 'questionsShow']);
         Route::put('questions/{question}', [AdminController::class, 'questionsUpdate']);
         Route::patch('questions/{question}', [AdminController::class, 'questionsUpdate']);

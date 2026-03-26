@@ -15,6 +15,7 @@ use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Models\Question;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 
@@ -22,7 +23,10 @@ class AdminController extends Controller
 {
     public function questionsIndex(): AnonymousResourceCollection
     {
-        return AdminQuestionResource::collection(Question::query()->latest()->paginate(50));
+        // For admin dashboard, we might want to see all questions or at least more than 50
+        // Let's use a higher limit for now or allow a 'per_page' parameter
+        $perPage = request()->integer('per_page', 1000); 
+        return AdminQuestionResource::collection(Question::query()->latest()->paginate($perPage));
     }
 
     public function questionsStore(StoreQuestionRequest $request): JsonResponse
@@ -32,6 +36,60 @@ class AdminController extends Controller
         return (new AdminQuestionResource($question))
             ->response()
             ->setStatusCode(201);
+    }
+
+    public function questionsBulkStore(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->validate([
+                'questions' => ['required', 'array'],
+                'questions.*.subject' => ['required', 'string'],
+                'questions.*.class_name' => ['required', 'string'],
+                'questions.*.question_text' => ['required', 'string'],
+                'questions.*.type' => ['sometimes', 'string', 'in:mcq,fib,boolean'],
+                'questions.*.option_a' => ['required_if:questions.*.type,mcq', 'nullable', 'string'],
+                'questions.*.option_b' => ['required_if:questions.*.type,mcq', 'nullable', 'string'],
+                'questions.*.option_c' => ['required_if:questions.*.type,mcq', 'nullable', 'string'],
+                'questions.*.option_d' => ['required_if:questions.*.type,mcq', 'nullable', 'string'],
+                'questions.*.correct_option' => ['required_if:questions.*.type,mcq', 'nullable', 'string', 'in:A,B,C,D'],
+                'questions.*.answer' => ['required_if:questions.*.type,fib', 'nullable', 'string'],
+                'questions.*.answerBool' => ['required_if:questions.*.type,boolean', 'nullable', 'boolean'],
+            ]);
+
+            $created = [];
+            DB::beginTransaction();
+            try {
+                foreach ($data['questions'] as $index => $qData) {
+                    $created[] = Question::query()->create($qData);
+                }
+                DB::commit();
+                \Illuminate\Support\Facades\Log::info("Bulk import successful: " . count($created) . " questions created.");
+            } catch (\Exception $e) {
+                DB::rollBack();
+                \Illuminate\Support\Facades\Log::error("Bulk import failed during creation: " . $e->getMessage(), [
+                    'exception' => $e,
+                    'data_sample' => array_slice($data['questions'], 0, 5)
+                ]);
+                throw $e;
+            }
+
+            return response()->json([
+                'message' => count($created) . ' questions imported successfully.',
+                'data' => AdminQuestionResource::collection($created)
+            ], 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Illuminate\Support\Facades\Log::warning("Bulk import validation failed: " . json_encode($e->errors()));
+            return response()->json([
+                'message' => 'Validation failed for some questions.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Bulk import critical error: " . $e->getMessage());
+            return response()->json([
+                'message' => 'An error occurred during bulk import.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function questionsShow(Question $question): AdminQuestionResource
@@ -54,9 +112,27 @@ class AdminController extends Controller
         return response()->json(['message' => 'Deleted.']);
     }
 
+    public function questionsBulkDestroy(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['required', 'integer', 'exists:questions,id'],
+        ]);
+
+        $count = 0;
+        DB::transaction(function () use ($data, &$count) {
+            $count = Question::query()->whereIn('id', $data['ids'])->delete();
+        });
+
+        return response()->json([
+            'message' => "$count questions deleted successfully."
+        ]);
+    }
+
     public function examsIndex(): AnonymousResourceCollection
     {
-        return ExamResource::collection(Exam::query()->latest()->paginate(50));
+        $perPage = request()->integer('per_page', 1000);
+        return ExamResource::collection(Exam::query()->latest()->paginate($perPage));
     }
 
     public function examsStore(StoreExamRequest $request): JsonResponse
@@ -112,9 +188,10 @@ class AdminController extends Controller
         return new ExamResource($exam);
     }
 
-    public function studentsIndex(): JsonResponse
+    public function studentsIndex(): AnonymousResourceCollection
     {
-        return response()->json(['data' => \App\Models\Student::query()->latest()->get()]);
+        $perPage = request()->integer('per_page', 1000);
+        return \App\Http\Resources\StudentResource::collection(\App\Models\Student::query()->latest()->paginate($perPage));
     }
 
     public function studentsStore(\Illuminate\Http\Request $request): JsonResponse
