@@ -25,8 +25,19 @@ class AdminController extends Controller
     {
         // For admin dashboard, we might want to see all questions or at least more than 50
         // Let's use a higher limit for now or allow a 'per_page' parameter
-        $perPage = request()->integer('per_page', 1000); 
-        return AdminQuestionResource::collection(Question::query()->latest()->paginate($perPage));
+        $perPage = request()->integer('per_page', 1000);
+
+        $query = Question::query();
+
+        if (request()->has('class_name') && request('class_name') !== 'all') {
+            $query->where('class_name', request('class_name'));
+        }
+
+        if (request()->has('subject') && request('subject') !== 'all') {
+            $query->where('subject', request('subject'));
+        }
+
+        return AdminQuestionResource::collection($query->latest()->paginate($perPage));
     }
 
     public function questionsStore(StoreQuestionRequest $request): JsonResponse

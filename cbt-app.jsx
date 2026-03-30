@@ -1494,7 +1494,7 @@ function BulkUploadModal({ onClose, onImport, toast, importing, importProgress }
 }
 
 // ── QUESTION MANAGEMENT ───────────────────────────────────────────────────────
-function QuestionManagement({ questions, setQuestions, toast }) {
+function QuestionManagement({ questions = [], setQuestions, toast }) {
   const [modal, setModal] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
   const [filters, setFilters] = useState({ subject: "all", class: "all" });
@@ -1503,14 +1503,30 @@ function QuestionManagement({ questions, setQuestions, toast }) {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
 
-  const filteredQuestions = useMemo(() => {
-    return (questions || []).filter(q => {
-      if (!q) return false;
-      const sMatch = filters.subject === "all" || (q.subject && String(q.subject).trim() === filters.subject);
-      const cMatch = filters.class === "all" || (q.class_name && String(q.class_name).trim() === filters.class);
-      return sMatch && cMatch;
-    });
-  }, [questions, filters]);
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const qs = await api.listQuestions({ per_page: 1000, class_name: filters.class, subject: filters.subject });
+        setQuestions((qs.data || []).map(q => ({
+          id: String(q.id),
+          subject: q.subject,
+          class_name: q.class_name,
+          type: q.type || "mcq",
+          question_text: q.question_text,
+          option_a: q.option_a,
+          option_b: q.option_b,
+          option_c: q.option_c,
+          option_d: q.option_d,
+          correct_option: q.correct_option,
+          answer: q.answer,
+          answerBool: q.answerBool,
+        })));
+      } catch (error) {
+        toast.error("Failed to fetch questions.");
+      }
+    };
+    fetch();
+  }, [filters]);
 
   const handleFilterChange = (type, value) => {
     setFilters(f => ({ ...f, [type]: value }));
@@ -1522,10 +1538,10 @@ function QuestionManagement({ questions, setQuestions, toast }) {
   };
 
   const toggleSelectAll = () => {
-    if (selected.length === filteredQuestions.length) {
+    if (selected.length === questions.length) {
       setSelected([]);
     } else {
-      setSelected(filteredQuestions.map(q => q.id));
+      setSelected(questions.map(q => q.id));
     }
   };
 
@@ -1693,10 +1709,10 @@ function QuestionManagement({ questions, setQuestions, toast }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: 16, background: "#f1f5f9", borderRadius: 6 }}>
-          <input type="checkbox" checked={selected.length === filteredQuestions.length && filteredQuestions.length > 0} onChange={toggleSelectAll} disabled={deletingIds.size > 0 || importing} />
+          <input type="checkbox" checked={selected.length === questions.length && questions.length > 0} onChange={toggleSelectAll} disabled={deletingIds.size > 0 || importing} />
           <span>{selected.length} selected</span>
         </div>
-        {filteredQuestions.map((q, i) => {
+        {questions.map((q, i) => {
           const isDeleting = deletingIds.has(q.id);
           return (
             <div key={q.id} style={{ 
@@ -1742,7 +1758,7 @@ function QuestionManagement({ questions, setQuestions, toast }) {
             </div>
           );
         })}
-        {filteredQuestions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No questions found.</div>}
+        {questions.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No questions found.</div>}
       </div>
       {modal && (
         <Modal title={modal === "add" ? "Add Question" : "Edit Question"} onClose={() => setModal(null)}>
@@ -2417,11 +2433,11 @@ function LiveMonitor({ students, exams }) {
 function AdminPanel({ onLogout, data, setData, toast }) {
   const [section, setSection] = useState("dashboard");
   const { students, exams, results, questions, users = [] } = data;
-  const setStudents = fn => setData(d => ({...d, students: fn(d.students)}));
-  const setExams = fn => setData(d => ({...d, exams: fn(d.exams)}));
-  const setResults = fn => setData(d => ({...d, results: fn(d.results)}));
-  const setQuestions = fn => setData(d => ({...d, questions: fn(d.questions)}));
-  const setUsers = fn => setData(d => ({...d, users: fn(d.users||[]) }));
+  const setStudents = fn => setData(d => ({ ...d, students: typeof fn === "function" ? fn(d.students || []) : fn }));
+  const setExams = fn => setData(d => ({ ...d, exams: typeof fn === "function" ? fn(d.exams || []) : fn }));
+  const setResults = fn => setData(d => ({ ...d, results: typeof fn === "function" ? fn(d.results || []) : fn }));
+  const setQuestions = fn => setData(d => ({ ...d, questions: typeof fn === "function" ? fn(d.questions || []) : fn }));
+  const setUsers = fn => setData(d => ({ ...d, users: typeof fn === "function" ? fn(d.users || []) : fn }));
   const [warnOpen, setWarnOpen] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const idleRef = useRef(Date.now());
