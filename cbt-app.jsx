@@ -307,6 +307,12 @@ function QuestionForm({ initial, onSave, onClose, loading }) {
 // ─── EXAM FORM ────────────────────────────────────────────────────────────────
 function ExamForm({ initial, questions, onSave, onClose, loading }) {
   const [form, setForm] = useState(initial || { title: "", subject: "", class_name: "SS3", description: "", duration_minutes: 30, starts_at: "", ends_at: "", is_active: true, question_ids: [] });
+  const [isRandomized, setIsRandomized] = useState(() => localStorage.getItem('exam_randomEnabled') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('exam_randomEnabled', isRandomized);
+  }, [isRandomized]);
+
   const set = k => e => { const v = e.target.type === "checkbox" ? e.target.checked : e.target.value; setForm(f => ({ ...f, [k]: v })); };
   const toggleQ = id => setForm(f => {
     const ids = f.question_ids.includes(id) ? f.question_ids.filter(x => x !== id) : [...f.question_ids, id];
@@ -323,6 +329,36 @@ function ExamForm({ initial, questions, onSave, onClose, loading }) {
       return (s === "" || qSubject === s) && (c === "" || qClass === c);
     });
   }, [questions, form.subject, form.class_name]);
+
+  const shuffledQs = useMemo(() => {
+    if (!isRandomized) return filteredQs;
+    const arr = [...filteredQs];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }, [filteredQs, isRandomized]);
+
+  const allSelected = filteredQs.length > 0 && filteredQs.every(q => form.question_ids.includes(q.id));
+
+  const toggleSelectAll = () => {
+    const nextIds = allSelected 
+      ? form.question_ids.filter(id => !filteredQs.find(q => q.id === id))
+      : Array.from(new Set([...form.question_ids, ...filteredQs.map(q => q.id)]));
+    
+    setForm(f => ({ ...f, question_ids: nextIds }));
+    
+    const event = new CustomEvent('exam:selectall', { detail: !allSelected });
+    window.dispatchEvent(event);
+  };
+
+  const btnControlStyle = {
+    width: 32, height: 32, borderRadius: 6, border: "1.5px solid #e2e8f0", 
+    background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", 
+    justifyContent: "center", fontSize: 16, transition: "all 0.2s ease",
+    padding: 0, outline: "none"
+  };
 
   return (
     <div>
@@ -351,17 +387,40 @@ function ExamForm({ initial, questions, onSave, onClose, loading }) {
         <Field label="Start Time (optional)"><input style={inputStyle} type="datetime-local" value={form.starts_at} onChange={set("starts_at")} disabled={loading} /></Field>
         <Field label="End Time (optional)"><input style={inputStyle} type="datetime-local" value={form.ends_at} onChange={set("ends_at")} disabled={loading} /></Field>
       </div>
-      <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
-        Select Questions ({form.question_ids.length} selected)
-      </p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#374151", margin: 0 }}>
+          Select Questions ({form.question_ids.length} selected)
+        </p>
+        <div style={{ display: "flex", gap: 8, direction: "ltr" /* Support RTL via flex */ }}>
+          <button 
+            type="button"
+            style={{ ...btnControlStyle, background: isRandomized ? "#eff6ff" : "#fff", borderColor: isRandomized ? "#3b82f6" : "#e2e8f0" }}
+            onClick={() => setIsRandomized(!isRandomized)}
+            aria-pressed={isRandomized}
+            aria-label="Randomize Questions"
+            title="Randomize Questions"
+          >
+            🎲
+          </button>
+          <button 
+            type="button"
+            style={{ ...btnControlStyle, color: allSelected ? "#1d4ed8" : "#374151" }}
+            onClick={toggleSelectAll}
+            aria-label={allSelected ? "Deselect All" : "Select All"}
+            title={allSelected ? "Deselect All" : "Select All"}
+          >
+            {allSelected ? "☑️" : "⬜"}
+          </button>
+        </div>
+      </div>
       <div style={{ maxHeight: 180, overflowY: "auto", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
-        {filteredQs.length === 0 && (
+        {shuffledQs.length === 0 && (
           <div style={{ textAlign: "center", padding: "20px 0" }}>
             <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>No questions found for this subject and class.</p>
             <p style={{ color: "#64748b", fontSize: 11, marginTop: 4 }}>Try changing the filters above or create new questions first.</p>
           </div>
         )}
-        {filteredQs.map(q => (
+        {shuffledQs.map(q => (
           <label key={q.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: loading ? "default" : "pointer", padding: "6px 0", borderBottom: "1px solid #f1f5f9", opacity: loading ? 0.7 : 1 }}>
             <input type="checkbox" checked={form.question_ids.includes(q.id)} onChange={() => toggleQ(q.id)} style={{ marginTop: 2, accentColor: "#1d4ed8" }} disabled={loading} />
             <span style={{ fontSize: 13, color: "#374151" }}>{q.question_text}</span>
@@ -2808,13 +2867,22 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
  
   const [answers, setAnswers] = useState(exam.initialAnswers || {});
   const [current, setCurrent] = useState(exam.initialIndex || 0);
-  const [timeLeft, setTimeLeft] = useState(exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60);
+  const timerKey = `exam_end_time_${student.id}_${exam.id}`;
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const saved = localStorage.getItem(timerKey);
+    if (saved) {
+      return Math.max(0, Math.floor((parseInt(saved) - Date.now()) / 1000));
+    }
+    return exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60;
+  });
+  const endTimeRef = useRef(null);
+  const timerRef = useRef(null);
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitted = useRef(false);
   const [errorMsg, setErrorMsg] = useState("");
   const startedAt = useRef(Date.now()).current;
- 
+
   // ── Incremental Saving (Heartbeat Sync) ───────────────────────────────────────
   const syncTimeoutRef = useRef(null);
   const lastSyncedAnswersRef = useRef(JSON.stringify(exam.initialAnswers || {}));
@@ -2869,13 +2937,15 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   useEffect(() => {
     return () => clearSession(student.id);
   }, []);
- 
+
   const doSubmit = useCallback(async () => {
     if (submitted.current) return;
     submitted.current = true;
     setIsSubmitting(true);
     
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+    localStorage.removeItem(timerKey);
 
     try {
       clearSession(student.id);                                   // ← remove from live board
@@ -2908,17 +2978,39 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
       }
       setErrorMsg(msg);
     }
-  }, [answers, qs, onSubmit, student.id]);
- 
+  }, [answers, qs, onSubmit, student.id, timerKey]);
+
   useEffect(() => {
-    const t = setInterval(() => {
-      setTimeLeft(tl => {
-        if (tl <= 1) { clearInterval(t); doSubmit(); return 0; }
-        return tl - 1;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [doSubmit]);
+    // 1. Initialize endTime
+    let endTime = localStorage.getItem(timerKey);
+    if (!endTime) {
+      const initialSeconds = exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60;
+      endTime = Date.now() + (initialSeconds * 1000);
+      localStorage.setItem(timerKey, endTime.toString());
+    } else {
+      endTime = parseInt(endTime);
+    }
+    endTimeRef.current = endTime;
+
+    // 2. Set up the timer
+    const tick = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((endTimeRef.current - now) / 1000));
+      setTimeLeft(remaining);
+      
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        doSubmit();
+      }
+    };
+
+    tick(); // Run immediately to set initial timeLeft
+    timerRef.current = setInterval(tick, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timerKey, exam.id, doSubmit]);
  
   const q = qs[current];
   const answered = Object.keys(answers).length;
