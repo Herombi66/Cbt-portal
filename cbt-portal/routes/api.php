@@ -24,6 +24,8 @@ Route::prefix('admin')->group(function (): void {
 
         Route::get('exams', [AdminController::class, 'examsIndex']);
         Route::post('exams', [AdminController::class, 'examsStore']);
+        Route::delete('exams/bulk', [AdminController::class, 'examsBulkDestroy']);
+        Route::post('exams/bulk-status', [AdminController::class, 'examsBulkStatus']);
         Route::get('exams/{exam}', [AdminController::class, 'examsShow']);
         Route::put('exams/{exam}', [AdminController::class, 'examsUpdate']);
         Route::patch('exams/{exam}', [AdminController::class, 'examsUpdate']);
@@ -33,6 +35,9 @@ Route::prefix('admin')->group(function (): void {
 
         Route::get('students', [AdminController::class, 'studentsIndex']);
         Route::post('students', [AdminController::class, 'studentsStore']);
+        Route::post('students/bulk', [AdminController::class, 'studentsBulkStore']);
+        Route::delete('students/bulk', [AdminController::class, 'studentsBulkDestroy']);
+        Route::post('students/bulk-status', [AdminController::class, 'studentsBulkStatus']);
         Route::put('students/{student}', [AdminController::class, 'studentsUpdate']);
         Route::delete('students/{student}', [AdminController::class, 'studentsDestroy']);
 

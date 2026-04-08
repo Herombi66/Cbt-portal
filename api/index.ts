@@ -89,6 +89,16 @@ export async function deleteExam(id: number): Promise<void> {
   await api.delete(`/admin/exams/${id}`)
 }
 
+export async function bulkDeleteExams(ids: number[]): Promise<{ message: string }> {
+  const { data } = await api.delete<{ message: string }>('/admin/exams/bulk', { data: { ids } })
+  return data
+}
+
+export async function bulkToggleExamsStatus(ids: number[], isActive: boolean): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>('/admin/exams/bulk-status', { ids, is_active: isActive })
+  return data
+}
+
 export async function assignExamQuestions(examId: number, questions: Array<{ question_id: number; sort_order: number }>): Promise<{ data: Exam }> {
   const { data } = await api.post<{ data: Exam }>(`/admin/exams/${examId}/assign-questions`, { questions })
   return data
@@ -113,6 +123,21 @@ export async function updateStudent(id: number, payload: Partial<Student>): Prom
 
 export async function deleteStudent(id: number): Promise<void> {
   await api.delete(`/admin/students/${id}`)
+}
+
+export async function bulkCreateStudents(students: Partial<Student>[]): Promise<{ data: Student[]; message: string }> {
+  const { data } = await api.post<{ data: Student[]; message: string }>('/admin/students/bulk', { students })
+  return data
+}
+
+export async function bulkDeleteStudents(ids: number[]): Promise<{ message: string }> {
+  const { data } = await api.delete<{ message: string }>('/admin/students/bulk', { data: { ids } })
+  return data
+}
+
+export async function bulkToggleStudentsStatus(ids: number[], isActive: boolean): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>('/admin/students/bulk-status', { ids, is_active: isActive })
+  return data
 }
 
 // --- Admin: Results ---

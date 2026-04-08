@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import * as api from "./api";
+import { bulkCreateStudents, bulkDeleteStudents, bulkToggleStudentsStatus } from "./api";
 import { setTokens, loadTokensFromStorage } from "./api/client";
 
 class ErrorBoundary extends React.Component {
@@ -874,7 +875,7 @@ function Dashboard({ students, exams, results, questions }) {
 }
 
 // ── BULK STUDENT UPLOAD MODAL ─────────────────────────────────────────────────
-function BulkStudentUploadModal({ onClose, onImport, existingStudents, toast }) {
+function BulkStudentUploadModal({ onClose, onImport, existingStudents, toast, loading }) {
   const [step, setStep] = useState("upload"); // "upload" | "preview"
   const [parsed, setParsed] = useState([]);
   const [errors, setErrors] = useState([]);
@@ -934,9 +935,16 @@ function BulkStudentUploadModal({ onClose, onImport, existingStudents, toast }) 
       if (rows.find(r => r.regNumber.toLowerCase() === regNumber.toLowerCase())) {
         skips.push(`Row ${rowNum}: reg_number "${regNumber}" appears more than once in file — skipped.`); return;
       }
+      if (email && rows.find(r => r.email && r.email.toLowerCase() === email.toLowerCase())) {
+        skips.push(`Row ${rowNum}: email "${email}" appears more than once in file — skipped.`); return;
+      }
+
       // duplicate against existing
       if (existingStudents.find(s => s.regNumber.toLowerCase() === regNumber.toLowerCase())) {
-        skips.push(`Row ${rowNum}: "${regNumber}" already registered — skipped.`); return;
+        skips.push(`Row ${rowNum}: Registration number "${regNumber}" is already registered — skipped.`); return;
+      }
+      if (email && existingStudents.find(s => s.email && s.email.toLowerCase() === email.toLowerCase())) {
+        skips.push(`Row ${rowNum}: Email "${email}" is already registered — skipped.`); return;
       }
       const normalGender = gender ? (gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase()) : "";
       rows.push({ regNumber, fullName, className, email, gender: normalGender });
@@ -960,7 +968,6 @@ function BulkStudentUploadModal({ onClose, onImport, existingStudents, toast }) 
 
   const confirmImport = () => {
     onImport(parsed);
-    onClose();
   };
 
   const totalIssues = errors.length + skipped.length;
@@ -1087,11 +1094,11 @@ function BulkStudentUploadModal({ onClose, onImport, existingStudents, toast }) 
             <div style={{display:"flex",gap:10}}>
               <button style={btnGhost} onClick={onClose}>Cancel</button>
               <button
-                style={{...btnPrimary,opacity:parsed.length===0?0.5:1}}
-                disabled={parsed.length===0}
+                style={{...btnPrimary,opacity:(parsed.length===0||loading)?0.5:1}}
+                disabled={parsed.length===0||loading}
                 onClick={confirmImport}
               >
-                Register {parsed.length} Student{parsed.length!==1?"s":""}
+                {loading ? "Registering..." : `Register ${parsed.length} Student${parsed.length!==1?"s":""}`}
               </button>
             </div>
           </div>
@@ -1107,11 +1114,55 @@ function StudentManagement({ students, setStudents, toast }) {
   const [showBulk, setShowBulk] = useState(false);
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState("All");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const filtered = students.filter(s =>
     (filterClass === "All" || s.className === filterClass) &&
     (s.fullName.toLowerCase().includes(search.toLowerCase()) || s.regNumber.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const toggleAll = () => {
+    if (selectedIds.length === filtered.length) setSelectedIds([]);
+    else setSelectedIds(filtered.map(s => s.id));
+  };
+
+  const toggleOne = id => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const bulkDelete = async () => {
+    if (!selectedIds.length) return;
+    if (!confirm(`Delete ${selectedIds.length} selected students?`)) return;
+    setBulkLoading(true);
+    try {
+      const ids = selectedIds.map(Number);
+      await bulkDeleteStudents(ids);
+      setStudents(ss => ss.filter(s => !selectedIds.includes(s.id)));
+      setSelectedIds([]);
+      toast.success("Bulk deletion successful.");
+    } catch (e) {
+      toast.error("Failed to delete selected students.");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const bulkStatus = async (active) => {
+    if (!selectedIds.length) return;
+    setBulkLoading(true);
+    try {
+      const ids = selectedIds.map(Number);
+      await bulkToggleStudentsStatus(ids, active);
+      setStudents(ss => ss.map(s => selectedIds.includes(s.id) ? { ...s, isActive: active } : s));
+      setSelectedIds([]);
+      toast.success(`Selected students ${active ? "enabled" : "disabled"}.`);
+    } catch (e) {
+      toast.error("Failed to update status for selected students.");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const save = async (form) => {
     if (!form.regNumber.trim() || !form.fullName.trim()) { toast.error("Registration number and full name are required."); return; }
@@ -1165,27 +1216,91 @@ function StudentManagement({ students, setStudents, toast }) {
   };
 
   const handleBulkImport = async newStudents => {
+    setBulkLoading(true);
     try {
-      const results = await Promise.all(newStudents.map(s => {
-        const payload = {
-          registration_number: s.regNumber.trim(),
-          name: s.fullName.trim(),
-          email: (s.email || "").trim() || `${s.regNumber.trim().replace(/\//g, '')}@cbtportal.edu`,
-          password: "password123",
-          class_name: (s.className || "").trim(),
-          gender: (s.gender || "").trim(),
-          is_active: true,
-        };
-        return api.createStudent(payload);
+      const payload = newStudents.map(s => ({
+        registration_number: s.regNumber.trim(),
+        name: s.fullName.trim(),
+        email: (s.email || "").trim() || `${s.regNumber.trim().replace(/\//g, '')}@cbtportal.edu`,
+        password: "password123",
+        class_name: (s.className || "").trim(),
+        gender: (s.gender || "").trim(),
+        is_active: true,
       }));
-      const mapped = results.map(res => {
-        const r = res.data;
-        return { id: String(r.id), regNumber: r.registration_number, fullName: r.name, className: r.class_name, email: r.email || "", gender: r.gender || "", isActive: Boolean(r.is_active) };
-      });
+
+      const res = await bulkCreateStudents(payload);
+      
+      const mapped = res.data.map(r => ({
+        id: String(r.id),
+        regNumber: r.registration_number,
+        fullName: r.name,
+        className: r.class_name,
+        email: r.email || "",
+        gender: r.gender || "",
+        isActive: Boolean(r.is_active),
+      }));
+
       setStudents(ss => [...ss, ...mapped]);
-      toast.success(`${mapped.length} students registered successfully!`);
+      
+      if (res.errors) {
+        const errorKeys = Object.keys(res.errors);
+        const totalFailed = errorKeys.length;
+        const messages = [];
+        
+        errorKeys.forEach(key => {
+          const fieldErrors = res.errors[key];
+          fieldErrors.forEach(err => {
+            const match = key.match(/^students\.(\d+)/);
+            if (match) {
+              const rowIdx = parseInt(match[1]) + 1;
+              messages.push(`Row ${rowIdx}: ${err}`);
+            } else {
+              messages.push(err);
+            }
+          });
+        });
+        
+        if (mapped.length > 0) {
+          toast.info(`${mapped.length} registered, but ${totalFailed} rows had issues. Check console for details.`);
+        } else {
+          toast.error(`Failed to register students. ${totalFailed} rows had issues.`);
+        }
+        console.warn("Partial bulk registration failures:", res.errors);
+      } else {
+        toast.success(`${mapped.length} students registered successfully!`);
+        setShowBulk(false);
+      }
     } catch (e) {
-      toast.error("Failed to bulk register some students.");
+      console.error("Bulk student registration error details:", e.response?.data || e.message);
+      
+      if (e.response?.status === 422 && e.response.data?.errors) {
+        const errors = e.response.data.errors;
+        let errMsg = "Registration failed: ";
+        const messages = [];
+        
+        Object.keys(errors).forEach(key => {
+          const fieldErrors = errors[key];
+          fieldErrors.forEach(err => {
+            const match = key.match(/^students\.(\d+)\.(.*)$/);
+            if (match) {
+              const rowIdx = parseInt(match[1]) + 1;
+              messages.push(`Row ${rowIdx}: ${err}`);
+            } else {
+              messages.push(err);
+            }
+          });
+        });
+        
+        // Join first 3 errors into a string for the toast
+        errMsg += messages.slice(0, 3).join(" | ");
+        if (messages.length > 3) errMsg += ` (...and ${messages.length - 3} more)`;
+        
+        toast.error(errMsg);
+      } else {
+        toast.error(e.response?.data?.message || "Failed to bulk register students.");
+      }
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -1198,6 +1313,22 @@ function StudentManagement({ students, setStudents, toast }) {
           <button style={btnPrimary} onClick={()=>setModal("add")}>+ Register Student</button>
         </div>
       </div>
+      
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div style={{background:"#f1f5f9",border:"1px solid #e2e8f0",borderRadius:12,padding:"10px 16px",marginBottom:16,display:"flex",alignItems:"center",gap:16,animation:"slideIn 0.2s ease"}}>
+          <span style={{fontSize:14,fontWeight:600,color:"#475569"}}>{selectedIds.length} student{selectedIds.length!==1?"s":""} selected</span>
+          <div style={{height:20,width:1,background:"#cbd5e1"}} />
+          <div style={{display:"flex",gap:8}}>
+            <button style={{...btnGhost,fontSize:13,padding:"6px 12px",borderColor:"#cbd5e1"}} onClick={()=>bulkStatus(true)} disabled={bulkLoading}>Enable</button>
+            <button style={{...btnGhost,fontSize:13,padding:"6px 12px",borderColor:"#cbd5e1"}} onClick={()=>bulkStatus(false)} disabled={bulkLoading}>Disable</button>
+            <button style={{...btnDanger,fontSize:13,padding:"6px 12px"}} onClick={bulkDelete} disabled={bulkLoading}>Delete Selected</button>
+          </div>
+          {bulkLoading && <span style={{fontSize:12,color:"#64748b",marginLeft:"auto"}}>Processing...</span>}
+          <button style={{marginLeft:bulkLoading?"8px":"auto",background:"none",border:"none",fontSize:13,color:"#64748b",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setSelectedIds([])}>Clear selection</button>
+        </div>
+      )}
+
       <div style={{display:"flex",gap:12,marginBottom:16}}>
         <input style={{...inputStyle,maxWidth:280}} placeholder="Search name or reg number…" value={search} onChange={e=>setSearch(e.target.value)}/>
         <select style={{...inputStyle,maxWidth:160}} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
@@ -1210,6 +1341,9 @@ function StudentManagement({ students, setStudents, toast }) {
         <table style={{width:"100%",borderCollapse:"collapse"}}>
           <thead>
             <tr style={{background:"#f8fafc"}}>
+              <th style={{padding:"12px 16px",width:40}}>
+                <input type="checkbox" checked={filtered.length > 0 && selectedIds.length === filtered.length} onChange={toggleAll}/>
+              </th>
               {["Reg Number","Full Name","Class","Status","Email","Actions"].map(h=>(
                 <th key={h} style={{padding:"12px 16px",textAlign:"left",fontSize:12,fontWeight:700,color:"#64748b",textTransform:"uppercase",letterSpacing:"0.05em"}}>{h}</th>
               ))}
@@ -1217,7 +1351,10 @@ function StudentManagement({ students, setStudents, toast }) {
           </thead>
           <tbody>
             {filtered.map(s => (
-              <tr key={s.id} style={{borderTop:"1px solid #f1f5f9"}}>
+              <tr key={s.id} style={{borderTop:"1px solid #f1f5f9",background:selectedIds.includes(s.id)?"#f8fafc":null}}>
+                <td style={{padding:"12px 16px"}}>
+                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={()=>toggleOne(s.id)}/>
+                </td>
                 <td style={{padding:"12px 16px",fontSize:14,fontWeight:600,color:"#1d4ed8"}}>{s.regNumber}</td>
                 <td style={{padding:"12px 16px",fontSize:14}}>{s.fullName}</td>
                 <td style={{padding:"12px 16px"}}><Badge>{s.className}</Badge></td>
@@ -1233,7 +1370,7 @@ function StudentManagement({ students, setStudents, toast }) {
                 </td>
               </tr>
             ))}
-            {filtered.length===0 && <tr><td colSpan={6} style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No students found.</td></tr>}
+            {filtered.length===0 && <tr><td colSpan={7} style={{padding:32,textAlign:"center",color:"#94a3b8"}}>No students found.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1248,6 +1385,7 @@ function StudentManagement({ students, setStudents, toast }) {
           onImport={handleBulkImport}
           existingStudents={students}
           toast={toast}
+          loading={bulkLoading}
         />
       )}
     </div>
@@ -1842,6 +1980,20 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
   const [modal, setModal] = useState(null);
   const [deletingIds, setDeletingIds] = useState(new Set());
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Sync selectedIds with exams when exams list changes (e.g. after a deletion or refresh)
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const next = new Set();
+      const currentIds = new Set(exams.map(e => e.id));
+      prev.forEach(id => {
+        if (currentIds.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [exams]);
 
   const save = async form => {
     if (!form.title?.trim() || !form.subject?.trim() || !form.class_name?.trim()) { 
@@ -1888,11 +2040,16 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
   };
 
   const del = async id => {
-    if (!confirm("Delete this exam?")) return;
+    if (!confirm("Delete this exam? This action is permanent.")) return;
     setDeletingIds(prev => new Set(prev).add(id));
     try {
       await api.deleteExam(id);
       setExams(es => es.filter(e => e.id !== id));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast.success("Deleted.");
     } catch {
       toast.error("Failed to delete exam.");
@@ -1916,26 +2073,165 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIds.size === exams.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(exams.map(e => e.id)));
+    }
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkAction = async (action) => {
+    const ids = Array.from(selectedIds).map(Number);
+    if (ids.length === 0) return;
+
+    let confirmMsg = "";
+    if (action === "delete") confirmMsg = `Are you sure you want to permanently delete ${ids.length} selected exams?`;
+    else if (action === "activate") confirmMsg = `Activate ${ids.length} selected exams?`;
+    else if (action === "deactivate") confirmMsg = `Deactivate ${ids.length} selected exams?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setBulkLoading(true);
+    try {
+      if (action === "delete") {
+        await api.bulkDeleteExams(ids);
+        setExams(es => es.filter(e => !ids.includes(Number(e.id))));
+        setSelectedIds(new Set());
+        toast.success(`${ids.length} exams deleted.`);
+      } else {
+        const isActive = action === "activate";
+        await api.bulkToggleExamsStatus(ids, isActive);
+        setExams(es => es.map(e => ids.includes(Number(e.id)) ? { ...e, is_active: isActive } : e));
+        toast.success(`${ids.length} exams ${isActive ? 'activated' : 'deactivated'}.`);
+      }
+    } catch (e) {
+      toast.error(e.response?.data?.message || `Failed to perform bulk ${action}.`);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const allSelected = exams.length > 0 && selectedIds.size === exams.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < exams.length;
+
   return (
-    <div>
+    <div style={{ position: "relative", minHeight: "400px" }}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#0f172a"}}>Exam Management</h1>
-        <button style={btnPrimary} onClick={()=>setModal("add")} disabled={saving}>+ Create Exam</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h1 style={{fontSize:22,fontWeight:800,margin:0,color:"#0f172a"}}>Exam Management</h1>
+          {exams.length > 0 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#64748b", cursor: "pointer", padding: "4px 8px", borderRadius: 6, background: "#f1f5f9" }}>
+              <input 
+                type="checkbox" 
+                checked={allSelected} 
+                ref={el => el && (el.indeterminate = someSelected)}
+                onChange={toggleSelectAll}
+                style={{ accentColor: "#1d4ed8" }}
+              />
+              Select All
+            </label>
+          )}
+        </div>
+        <button style={btnPrimary} onClick={()=>setModal("add")} disabled={saving || bulkLoading}>+ Create Exam</button>
       </div>
+
+      {/* Sticky Bulk Action Bar */}
+       {selectedIds.size > 0 && (
+         <div 
+           role="region" 
+           aria-label="Bulk actions" 
+           style={{
+             position: "sticky",
+             top: 20,
+             zIndex: 50,
+             background: "#fff",
+             borderRadius: 12,
+             padding: "12px 20px",
+             boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
+             display: "flex",
+             justifyContent: "space-between",
+             alignItems: "center",
+             gap: 16,
+             flexWrap: "wrap",
+             marginBottom: 20,
+             border: "1px solid #e2e8f0",
+             animation: "slideInDown 0.2s ease-out"
+           }}
+         >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ background: "#dbeafe", color: "#1d4ed8", padding: "4px 10px", borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+              {selectedIds.size} Selected
+            </div>
+            <button 
+              onClick={() => setSelectedIds(new Set())}
+              style={{ background: "none", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Deselect
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button 
+              style={{ ...btnGhost, background: "#dcfce7", color: "#16a34a" }} 
+              onClick={() => handleBulkAction("activate")}
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? "..." : "Bulk Activate"}
+            </button>
+            <button 
+              style={{ ...btnGhost, background: "#fef9c3", color: "#ca8a04" }} 
+              onClick={() => handleBulkAction("deactivate")}
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? "..." : "Bulk Deactivate"}
+            </button>
+            <button 
+              style={{ ...btnDanger }} 
+              onClick={() => handleBulkAction("delete")}
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? "..." : "Bulk Delete"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
         {exams.map(e => {
           const subResults = results.filter(r=>r.examId===e.id);
           const isDeleting = deletingIds.has(e.id);
+          const isSelected = selectedIds.has(e.id);
           return (
             <div key={e.id} style={{ 
               background: "#fff", 
               borderRadius: 10, 
               padding: "18px 22px", 
-              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              boxShadow: isSelected ? "0 0 0 2px #3b82f6, 0 2px 8px rgba(0,0,0,0.06)" : "0 2px 8px rgba(0,0,0,0.06)",
               opacity: isDeleting ? 0.5 : 1,
-              transition: "opacity 0.2s"
+              transition: "all 0.2s",
+              display: "flex",
+              gap: 16,
+              alignItems: "flex-start"
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <div style={{ paddingTop: 4 }}>
+                <input 
+                  type="checkbox" 
+                  checked={isSelected} 
+                  onChange={() => toggleSelectOne(e.id)}
+                  aria-label={`Select exam: ${e.title}`}
+                  style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#1d4ed8" }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flex: 1 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{e.title}</span>
@@ -1948,9 +2244,9 @@ function ExamManagement({ exams, setExams, questions, results, toast }) {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-                  <button style={btnGhost} onClick={() => toggle(e.id)} disabled={isDeleting || saving}>{e.is_active ? "Deactivate" : "Activate"}</button>
-                  <button style={btnGhost} onClick={() => setModal(e)} disabled={isDeleting || saving}>Edit</button>
-                  <button style={btnDanger} onClick={() => del(e.id)} disabled={isDeleting || saving}>{isDeleting ? "..." : "Delete"}</button>
+                  <button style={btnGhost} onClick={() => toggle(e.id)} disabled={isDeleting || saving || bulkLoading}>{e.is_active ? "Deactivate" : "Activate"}</button>
+                  <button style={btnGhost} onClick={() => setModal(e)} disabled={isDeleting || saving || bulkLoading}>Edit</button>
+                  <button style={btnDanger} onClick={() => del(e.id)} disabled={isDeleting || saving || bulkLoading}>{isDeleting ? "..." : "Delete"}</button>
                 </div>
               </div>
             </div>
@@ -2867,22 +3163,18 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
  
   const [answers, setAnswers] = useState(exam.initialAnswers || {});
   const [current, setCurrent] = useState(exam.initialIndex || 0);
-  const timerKey = `exam_end_time_${student.id}_${exam.id}`;
   const [timeLeft, setTimeLeft] = useState(() => {
-    const saved = localStorage.getItem(timerKey);
-    if (saved) {
-      return Math.max(0, Math.floor((parseInt(saved) - Date.now()) / 1000));
-    }
-    return exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60;
+    const fromProps = Number(exam.remainingSeconds);
+    const fallback = (Number(exam.duration_minutes) || Number(exam.duration) || 30) * 60;
+    // If fromProps is valid (including 0), use it. Fallback only if null/undefined.
+    return (exam.remainingSeconds !== undefined && exam.remainingSeconds !== null) ? fromProps : fallback;
   });
-  const endTimeRef = useRef(null);
-  const timerRef = useRef(null);
   const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitted = useRef(false);
   const [errorMsg, setErrorMsg] = useState("");
   const startedAt = useRef(Date.now()).current;
-
+ 
   // ── Incremental Saving (Heartbeat Sync) ───────────────────────────────────────
   const syncTimeoutRef = useRef(null);
   const lastSyncedAnswersRef = useRef(JSON.stringify(exam.initialAnswers || {}));
@@ -2937,15 +3229,13 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
   useEffect(() => {
     return () => clearSession(student.id);
   }, []);
-
+ 
   const doSubmit = useCallback(async () => {
     if (submitted.current) return;
     submitted.current = true;
     setIsSubmitting(true);
     
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
-    localStorage.removeItem(timerKey);
 
     try {
       clearSession(student.id);                                   // ← remove from live board
@@ -2978,39 +3268,17 @@ function ExamInterface({ student, exam, questions, onSubmit }) {
       }
       setErrorMsg(msg);
     }
-  }, [answers, qs, onSubmit, student.id, timerKey]);
-
+  }, [answers, qs, onSubmit, student.id]);
+ 
   useEffect(() => {
-    // 1. Initialize endTime
-    let endTime = localStorage.getItem(timerKey);
-    if (!endTime) {
-      const initialSeconds = exam.remainingSeconds || (exam.duration_minutes || exam.duration || 30) * 60;
-      endTime = Date.now() + (initialSeconds * 1000);
-      localStorage.setItem(timerKey, endTime.toString());
-    } else {
-      endTime = parseInt(endTime);
-    }
-    endTimeRef.current = endTime;
-
-    // 2. Set up the timer
-    const tick = () => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((endTimeRef.current - now) / 1000));
-      setTimeLeft(remaining);
-      
-      if (remaining <= 0) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        doSubmit();
-      }
-    };
-
-    tick(); // Run immediately to set initial timeLeft
-    timerRef.current = setInterval(tick, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [timerKey, exam.id, doSubmit]);
+    const t = setInterval(() => {
+      setTimeLeft(tl => {
+        if (tl <= 1) { clearInterval(t); doSubmit(); return 0; }
+        return tl - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [doSubmit]);
  
   const q = qs[current];
   const answered = Object.keys(answers).length;

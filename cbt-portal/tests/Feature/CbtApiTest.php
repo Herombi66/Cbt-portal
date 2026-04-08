@@ -32,6 +32,8 @@ class CbtApiTest extends TestCase
         $token = (string) $login->json('token');
 
         $question = $this->withToken($token)->postJson('/api/admin/questions', [
+            'subject' => 'Math',
+            'class_name' => 'SS3',
             'question_text' => '2 + 2 = ?',
             'option_a' => '3',
             'option_b' => '4',
@@ -42,6 +44,8 @@ class CbtApiTest extends TestCase
 
         $exam = $this->withToken($token)->postJson('/api/admin/exams', [
             'title' => 'Math Test',
+            'subject' => 'Math',
+            'class_name' => 'SS3',
             'duration_minutes' => 30,
             'is_active' => true,
         ])->assertCreated()->json();

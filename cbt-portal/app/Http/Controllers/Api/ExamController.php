@@ -33,11 +33,20 @@ class ExamController extends Controller
         /** @var Student $student */
         $student = $request->user();
 
+        // Check if already completed or result exists
+        $hasResult = ExamResult::query()
+            ->where('student_id', $student->id)
+            ->where('exam_id', $exam->id)
+            ->exists();
+
         $session = ExamSession::query()
             ->where('student_id', $student->id)
             ->where('exam_id', $exam->id)
-            ->where('status', 'in_progress')
             ->first();
+
+        if ($hasResult || ($session && $session->status === 'completed')) {
+            return response()->json(['message' => 'Exam already completed.'], 422);
+        }
 
         if (! $session) {
             $session = ExamSession::query()->create([
@@ -45,13 +54,16 @@ class ExamController extends Controller
                 'exam_id' => $exam->id,
                 'status' => 'in_progress',
                 'start_time' => $now,
+                'last_synced_at' => $now,
                 'current_question_index' => 0,
                 'answers_provided' => [],
             ]);
         }
 
         $durationSeconds = $exam->duration_minutes * 60;
-        $elapsedSeconds = $now->diffInSeconds($session->start_time);
+        $elapsedSeconds = $session->start_time->diffInSeconds($now, false);
+        // Ensure elapsedSeconds is at least 0 (case of server time drift or timezone mismatch)
+        $elapsedSeconds = max(0, $elapsedSeconds);
         $remainingSeconds = max(0, $durationSeconds - $elapsedSeconds);
 
         return response()->json([
@@ -94,7 +106,9 @@ class ExamController extends Controller
         if ($session) {
             $now = CarbonImmutable::now();
             $durationSeconds = $session->exam->duration_minutes * 60;
-            $elapsedSeconds = $now->diffInSeconds($session->start_time);
+            $elapsedSeconds = $session->start_time->diffInSeconds($now, false);
+            // Ensure elapsedSeconds is at least 0 (case of server time drift or timezone mismatch)
+            $elapsedSeconds = max(0, $elapsedSeconds);
             $remainingSeconds = max(0, $durationSeconds - $elapsedSeconds);
 
             if ($remainingSeconds <= 0) {

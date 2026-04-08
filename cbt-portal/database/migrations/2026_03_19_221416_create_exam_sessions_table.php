@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignId('exam_id')->constrained('exams')->onDelete('cascade');
             $table->integer('current_question_index')->default(0);
             $table->json('answers_provided')->nullable();
-            $table->timestamp('start_time')->useCurrent();
-            $table->timestamp('last_synced_at')->useCurrent()->useCurrentOnUpdate();
+            $table->timestamp('start_time')->nullable();
+            $table->timestamp('last_synced_at')->nullable();
             $table->enum('status', ['in_progress', 'completed'])->default('in_progress');
             $table->timestamps();
 
